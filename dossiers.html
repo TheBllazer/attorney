@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dossiers Judiciaires — Grassoni & Associates</title>
+  <link rel="stylesheet" href="shared.css"/>
+</head>
+<body>
+<div id="loading-overlay"><div style="font-size:2.2rem">📁</div><div class="lo-spinner"></div><div class="lo-text">Ouverture des Dossiers Judiciaires…</div></div>
+<div id="sidebar"></div>
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title">Grassoni & Associates — Dossiers Judiciaires</div>
+    <div class="topbar-date" id="topbarDate"></div>
+  </div>
+  <div class="page-content">
+    <div class="page-header">
+      <div><h1>Dossiers Judiciaires</h1><div class="subtitle">Registre des affaires en cours et archivées du cabinet</div></div>
+      <button class="btn btn-primary" onclick="openModal()">📁 Ouvrir un Dossier</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><span class="stat-icon">📁</span><div class="stat-number" id="sd-total">0</div><div class="stat-label">Total Dossiers</div></div>
+      <div class="stat-card"><span class="stat-icon">⚖</span><div class="stat-number" id="sd-active">0</div><div class="stat-label">En Cours</div></div>
+      <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-number" id="sd-pending">0</div><div class="stat-label">En Attente</div></div>
+      <div class="stat-card"><span class="stat-icon">✅</span><div class="stat-number" id="sd-closed">0</div><div class="stat-label">Clôturés</div></div>
+    </div>
+    <div class="panel">
+      <div class="search-bar">
+        <input class="search-input" id="searchInput" placeholder="Rechercher par intitulé, client, type…" oninput="renderTable()"/>
+        <select class="form-select" id="filterStatus" onchange="renderTable()" style="width:160px;">
+          <option value="">Tous statuts</option>
+          <option>En cours</option><option>En attente</option><option>Clôturé</option><option>Urgent</option>
+        </select>
+        <select class="form-select" id="filterType" onchange="renderTable()" style="width:170px;">
+          <option value="">Tous types</option>
+          <option>Civil</option><option>Pénal</option><option>Foncier</option><option>Commercial</option><option>Successoral</option><option>Notarial</option>
+        </select>
+      </div>
+      <table class="reg-table" id="dossierTable">
+        <thead><tr><th>Réf.</th><th>Intitulé</th><th>Type</th><th>Client(s)</th><th>Juridiction</th><th>Statut</th><th>Ouverture</th><th>Avocat Resp.</th><th>Actions</th></tr></thead>
+        <tbody id="dossierTbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">— Aucun dossier ouvert dans ce registre —</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal création -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">📁 Ouverture d'un Nouveau Dossier</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Intitulé du Dossier *</label><input class="form-input" id="f-intitule" placeholder="ex: Succession Braithwaite c/ Grays"/></div>
+        <div class="form-group"><label class="form-label">Type d'Affaire *</label>
+          <select class="form-select" id="f-type"><option>Civil</option><option>Pénal</option><option>Foncier</option><option>Commercial</option><option>Successoral</option><option>Notarial</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Statut</label>
+          <select class="form-select" id="f-status"><option>En cours</option><option>En attente</option><option>Clôturé</option><option>Urgent</option></select></div>
+        <div class="form-group"><label class="form-label">Client Principal</label><input class="form-input" id="f-client" placeholder="Nom du client"/></div>
+        <div class="form-group"><label class="form-label">Partie Adverse</label><input class="form-input" id="f-adverse" placeholder="Nom de la partie adverse"/></div>
+        <div class="form-group"><label class="form-label">Juridiction</label>
+          <select class="form-select" id="f-juridiction">
+            <option>Tribunal de Saint Denis</option><option>Tribunal de Rhodes</option><option>Cour de Blackwater</option><option>Tribunal de Strawberry</option><option>Cour d'Annesburg</option><option>Tribunal Fédéral</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Avocat Responsable</label><input class="form-input" id="f-avocat" placeholder="Maître Grassoni…"/></div>
+        <div class="form-group"><label class="form-label">Date d'Ouverture</label><input class="form-input" type="date" id="f-ouverture"/></div>
+        <div class="form-group"><label class="form-label">Prochaine Audience</label><input class="form-input" type="date" id="f-audience"/></div>
+        <div class="form-group"><label class="form-label">Honoraires Prévus ($)</label><input class="form-input" type="number" id="f-honoraires" placeholder="0.00"/></div>
+        <div class="form-group full"><label class="form-label">Description & Faits</label><textarea class="form-textarea" id="f-description" placeholder="Résumé des faits, contexte, prétentions des parties…" style="min-height:100px;"></textarea></div>
+        <div class="form-group full"><label class="form-label">Pièces & Documents</label><textarea class="form-textarea" id="f-pieces" placeholder="Liste des pièces jointes, actes, témoignages…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Notes Confidentielles</label><textarea class="form-textarea" id="f-notes" placeholder="Stratégie, observations internes…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveDossier()">📁 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header">
+      <span class="modal-title">📋 Fiche Dossier</span>
+      <button class="modal-close" onclick="closeDetail()">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeDetail()">Fermer</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
+const app=initializeApp(FC); const auth=getAuth(app); const db=getFirestore(app);
+let dossiers=[],editId=null;
+
+onAuthStateChanged(auth, async user=>{
+  if(!user){window.location.href="login.html";return;}
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
+  buildSidebar(p,"dossiers.html"); setDate(); listenDossiers();
+  document.getElementById("loading-overlay").style.display="none";
+});
+
+function listenDossiers(){
+  onSnapshot(query(collection(db,"dossiers"),orderBy("createdAt","desc")),snap=>{
+    dossiers=snap.docs.map(d=>({id:d.id,...d.data()}));
+    document.getElementById("sd-total").textContent=dossiers.length;
+    document.getElementById("sd-active").textContent=dossiers.filter(d=>d.status==="En cours").length;
+    document.getElementById("sd-pending").textContent=dossiers.filter(d=>d.status==="En attente").length;
+    document.getElementById("sd-closed").textContent=dossiers.filter(d=>d.status==="Clôturé").length;
+    renderTable();
+  });
+}
+
+window.renderTable=function(){
+  const q=document.getElementById("searchInput").value.toLowerCase();
+  const fs=document.getElementById("filterStatus").value;
+  const ft=document.getElementById("filterType").value;
+  let list=dossiers.filter(d=>{
+    const t=`${d.intitule} ${d.client} ${d.type}`.toLowerCase();
+    return(!q||t.includes(q))&&(!fs||d.status===fs)&&(!ft||d.type===ft);
+  });
+  document.getElementById("emptyState").style.display=list.length?"none":"block";
+  const statusBadge=s=>s==="En cours"?"badge-active":s==="Urgent"?"badge-urgent":s==="Clôturé"?"badge-closed":"badge-pending";
+  document.getElementById("dossierTbody").innerHTML=list.map((d,i)=>`
+    <tr>
+      <td style="font-family:'IM Fell English SC',serif;font-size:0.7rem;color:var(--sepia);">DOS-${String(i+1).padStart(4,"0")}</td>
+      <td><div style="font-weight:600;color:var(--ink);max-width:200px;">${d.intitule}</div>${d.adverse?`<div style="font-size:0.72rem;color:var(--sepia);font-style:italic;">c/ ${d.adverse}</div>`:""}</td>
+      <td><span class="tag">${d.type||"—"}</span></td>
+      <td>${d.client||"—"}</td>
+      <td style="font-size:0.78rem;color:var(--ink-faded);">${d.juridiction||"—"}</td>
+      <td><span class="badge ${statusBadge(d.status)}">${d.status||"—"}</span></td>
+      <td style="font-size:0.75rem;color:var(--sepia);">${d.ouverture||"—"}</td>
+      <td style="font-size:0.8rem;font-style:italic;color:var(--ink-faded);">${d.avocat||"—"}</td>
+      <td>
+        <button class="btn btn-sm btn-secondary btn-icon" onclick="viewDossier('${d.id}')">🔍</button>
+        <button class="btn btn-sm btn-secondary btn-icon" onclick="editDossier('${d.id}')">✏️</button>
+        <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDossier('${d.id}')">🗑</button>
+      </td>
+    </tr>`).join("");
+};
+
+window.openModal=function(){
+  editId=null;
+  document.getElementById("modalTitle").textContent="📁 Ouverture d'un Nouveau Dossier";
+  ["intitule","client","adverse","avocat","honoraires","description","pieces","notes"].forEach(f=>document.getElementById("f-"+f).value="");
+  document.getElementById("f-ouverture").value=new Date().toISOString().slice(0,10);
+  document.getElementById("f-audience").value="";
+  document.getElementById("modalOverlay").classList.add("open");
+};
+window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
+
+window.editDossier=function(id){
+  const d=dossiers.find(x=>x.id===id);if(!d)return;
+  editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier le Dossier";
+  document.getElementById("f-intitule").value=d.intitule||"";
+  document.getElementById("f-type").value=d.type||"Civil";
+  document.getElementById("f-status").value=d.status||"En cours";
+  document.getElementById("f-client").value=d.client||"";
+  document.getElementById("f-adverse").value=d.adverse||"";
+  document.getElementById("f-juridiction").value=d.juridiction||"Tribunal de Saint Denis";
+  document.getElementById("f-avocat").value=d.avocat||"";
+  document.getElementById("f-ouverture").value=d.ouverture||"";
+  document.getElementById("f-audience").value=d.audience||"";
+  document.getElementById("f-honoraires").value=d.honoraires||"";
+  document.getElementById("f-description").value=d.description||"";
+  document.getElementById("f-pieces").value=d.pieces||"";
+  document.getElementById("f-notes").value=d.notes||"";
+  document.getElementById("modalOverlay").classList.add("open");
+};
+
+window.saveDossier=async function(){
+  const intitule=document.getElementById("f-intitule").value.trim();
+  if(!intitule){showToast("L'intitulé est obligatoire.");return;}
+  const data={intitule,type:document.getElementById("f-type").value,status:document.getElementById("f-status").value,
+    client:document.getElementById("f-client").value.trim(),adverse:document.getElementById("f-adverse").value.trim(),
+    juridiction:document.getElementById("f-juridiction").value,avocat:document.getElementById("f-avocat").value.trim(),
+    ouverture:document.getElementById("f-ouverture").value,audience:document.getElementById("f-audience").value,
+    honoraires:document.getElementById("f-honoraires").value,description:document.getElementById("f-description").value.trim(),
+    pieces:document.getElementById("f-pieces").value.trim(),notes:document.getElementById("f-notes").value.trim(),
+    updatedAt:new Date().toISOString()};
+  try{
+    if(editId){await updateDoc(doc(db,"dossiers",editId),data);showToast("Dossier mis à jour.");}
+    else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"dossiers"),data);showToast("Dossier ouvert.");}
+    closeModal();
+  }catch(e){showToast("Erreur: "+e.message);}
+};
+
+window.deleteDossier=async function(id){
+  if(!confirm("Clôturer et supprimer ce dossier ?"))return;
+  await deleteDoc(doc(db,"dossiers",id));showToast("Dossier supprimé.");
+};
+
+window.viewDossier=function(id){
+  const d=dossiers.find(x=>x.id===id);if(!d)return;
+  const statusBadge=s=>s==="En cours"?"badge-active":s==="Urgent"?"badge-urgent":s==="Clôturé"?"badge-closed":"badge-pending";
+  document.getElementById("detailBody").innerHTML=`
+    <div style="margin-bottom:1rem;"><div style="font-family:'IM Fell English SC',serif;font-size:1.15rem;color:var(--bordeaux-dark);">${d.intitule}</div>
+    ${d.adverse?`<div style="font-style:italic;color:var(--sepia);font-size:0.88rem;">contre ${d.adverse}</div>`:""}
+    <div style="margin-top:0.4rem;"><span class="tag">${d.type}</span> <span class="badge ${statusBadge(d.status)}">${d.status}</span></div></div>
+    <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
+      ${row2("Client",d.client)}${row2("Juridiction",d.juridiction)}${row2("Avocat",d.avocat)}
+      ${row2("Ouverture",d.ouverture)}${row2("Prochaine Audience",d.audience)}${row2("Honoraires",d.honoraires?"$"+d.honoraires:"")}
+    </table>
+    ${d.description?`<div class="divider-ornament"><span class="ornament-text">FAITS & DESCRIPTION</span></div><p style="font-size:0.9rem;color:var(--ink-faded);line-height:1.6;">${d.description}</p>`:""}
+    ${d.pieces?`<div class="divider-ornament"><span class="ornament-text">PIÈCES</span></div><p style="font-size:0.85rem;color:var(--ink-faded);font-style:italic;">${d.pieces}</p>`:""}
+    ${d.notes?`<div class="divider-ornament"><span class="ornament-text">NOTES CONFIDENTIELLES</span></div><p style="font-size:0.85rem;color:var(--ink-faded);font-style:italic;">${d.notes}</p>`:""}`;
+  document.getElementById("detailOverlay").classList.add("open");
+};
+function row2(l,v){return v?`<tr><td style="font-family:'IM Fell English SC',serif;font-size:0.63rem;letter-spacing:0.1em;color:var(--sepia);padding:0.3rem 0.5rem 0.3rem 0;width:38%;border-bottom:1px dashed var(--parchment-dark);">${l}</td><td style="padding:0.3rem 0;border-bottom:1px dashed var(--parchment-dark);color:var(--ink-faded);">${v}</td></tr>`:""; }
+window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove("open");
+
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
+function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
+window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
+function buildSidebar(profile,current){
+  const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];
+  let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});
+  for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+  document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;
+}
+</script>
+</body>
+</html>

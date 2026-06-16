@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Livre de Comptes — Grassoni & Associates</title>
+  <link rel="stylesheet" href="shared.css"/>
+</head>
+<body>
+<div id="loading-overlay"><div style="font-size:2.2rem">💰</div><div class="lo-spinner"></div><div class="lo-text">Ouverture du Livre de Comptes…</div></div>
+<div id="sidebar"></div>
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title">Grassoni & Associates — Livre de Comptes</div>
+    <div class="topbar-date" id="topbarDate"></div>
+  </div>
+  <div class="page-content">
+    <div class="page-header">
+      <div><h1>Livre de Comptes</h1><div class="subtitle">Registre comptable des honoraires, dépenses et recettes du cabinet</div></div>
+      <button class="btn btn-primary" onclick="openModal()">💰 Inscrire une Opération</button>
+    </div>
+
+    <!-- Financial summary -->
+    <div class="stats-row">
+      <div class="stat-card" style="border-top-color:#2a6a2a;"><span class="stat-icon">📈</span><div class="stat-number" id="sc-recettes" style="color:#2a4a10;">$0</div><div class="stat-label">Recettes Totales</div></div>
+      <div class="stat-card" style="border-top-color:#6b1a1a;"><span class="stat-icon">📉</span><div class="stat-number" id="sc-depenses" style="color:var(--bordeaux-dark);">$0</div><div class="stat-label">Dépenses Totales</div></div>
+      <div class="stat-card"><span class="stat-icon">⚖</span><div class="stat-number" id="sc-solde">$0</div><div class="stat-label">Solde Net</div></div>
+      <div class="stat-card"><span class="stat-icon">⏳</span><div class="stat-number" id="sc-pending" style="color:#7a5c10;">$0</div><div class="stat-label">Honoraires En Attente</div></div>
+    </div>
+
+    <!-- Filters -->
+    <div class="panel">
+      <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+        <select class="form-select" id="filterType" onchange="renderTable()" style="width:160px;">
+          <option value="">Toutes opérations</option>
+          <option value="recette">Recettes</option>
+          <option value="depense">Dépenses</option>
+        </select>
+        <select class="form-select" id="filterCat" onchange="renderTable()" style="width:180px;">
+          <option value="">Toutes catégories</option>
+          <option>Honoraires</option><option>Provision</option><option>Frais de justice</option>
+          <option>Salaires</option><option>Loyer & charges</option><option>Fournitures</option><option>Autre</option>
+        </select>
+        <input class="search-input" id="searchInput" placeholder="Rechercher…" oninput="renderTable()" style="flex:1;min-width:150px;"/>
+      </div>
+      <table class="reg-table">
+        <thead><tr><th>Date</th><th>Libellé</th><th>Catégorie</th><th>Client / Dossier</th><th>Type</th><th>Montant ($)</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="comptaTbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">— Aucune opération inscrite dans ce livre —</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">💰 Inscription d'une Opération</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Libellé de l'Opération *</label><input class="form-input" id="f-libelle" placeholder="ex: Honoraires - Affaire Braithwaite, Loyer bureaux…"/></div>
+        <div class="form-group"><label class="form-label">Type *</label>
+          <select class="form-select" id="f-type" onchange="updateTypeColor()">
+            <option value="recette">Recette / Crédit</option>
+            <option value="depense">Dépense / Débit</option>
+          </select></div>
+        <div class="form-group"><label class="form-label">Catégorie</label>
+          <select class="form-select" id="f-categorie"><option>Honoraires</option><option>Provision</option><option>Frais de justice</option><option>Salaires</option><option>Loyer & charges</option><option>Fournitures</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Montant ($) *</label><input class="form-input" type="number" id="f-montant" placeholder="0.00" step="0.01"/></div>
+        <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f-date"/></div>
+        <div class="form-group"><label class="form-label">Client</label><input class="form-input" id="f-client" placeholder="Nom du client"/></div>
+        <div class="form-group"><label class="form-label">Référence Dossier</label><input class="form-input" id="f-dossier" placeholder="ex: DOS-0042"/></div>
+        <div class="form-group"><label class="form-label">Mode de Règlement</label>
+          <select class="form-select" id="f-mode"><option>Espèces</option><option>Chèque</option><option>Traite</option><option>Virement</option><option>Or</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Statut</label>
+          <select class="form-select" id="f-status"><option>Réglé</option><option>En attente</option><option>Partiellement réglé</option><option>Contentieux</option></select></div>
+        <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Observations, conditions, références…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveOp()">💰 Inscrire</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
+const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
+let items=[],editId=null;
+onAuthStateChanged(auth,async user=>{
+  if(!user){window.location.href="login.html";return;}
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
+  buildSidebar(p,"comptabilite.html");setDate();listen();
+  document.getElementById("loading-overlay").style.display="none";
+});
+function listen(){
+  onSnapshot(query(collection(db,"comptabilite"),orderBy("createdAt","desc")),snap=>{
+    items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    updateStats();renderTable();
+  });
+}
+function updateStats(){
+  const rec=items.filter(i=>i.type==="recette").reduce((s,i)=>s+(parseFloat(i.montant)||0),0);
+  const dep=items.filter(i=>i.type==="depense").reduce((s,i)=>s+(parseFloat(i.montant)||0),0);
+  const pend=items.filter(i=>i.status==="En attente"&&i.type==="recette").reduce((s,i)=>s+(parseFloat(i.montant)||0),0);
+  const solde=rec-dep;
+  document.getElementById("sc-recettes").textContent="$"+rec.toLocaleString("fr-FR",{minimumFractionDigits:2});
+  document.getElementById("sc-depenses").textContent="$"+dep.toLocaleString("fr-FR",{minimumFractionDigits:2});
+  document.getElementById("sc-solde").textContent=(solde>=0?"$":"- $")+(Math.abs(solde)).toLocaleString("fr-FR",{minimumFractionDigits:2});
+  document.getElementById("sc-solde").style.color=solde>=0?"#2a4a10":"var(--bordeaux-dark)";
+  document.getElementById("sc-pending").textContent="$"+pend.toLocaleString("fr-FR",{minimumFractionDigits:2});
+}
+window.renderTable=function(){
+  const q=document.getElementById("searchInput").value.toLowerCase();
+  const ft=document.getElementById("filterType").value;
+  const fc=document.getElementById("filterCat").value;
+  let list=items.filter(i=>{
+    const t=`${i.libelle} ${i.client} ${i.dossier} ${i.categorie}`.toLowerCase();
+    return(!q||t.includes(q))&&(!ft||i.type===ft)&&(!fc||i.categorie===fc);
+  });
+  document.getElementById("emptyState").style.display=list.length?"none":"block";
+  const sBadge=s=>s==="Réglé"?"badge-active":s==="En attente"?"badge-pending":s==="Contentieux"?"badge-urgent":"badge-closed";
+  document.getElementById("comptaTbody").innerHTML=list.map(item=>`
+    <tr>
+      <td style="font-size:0.78rem;color:var(--sepia);">${item.date||"—"}</td>
+      <td><div style="font-weight:600;color:var(--ink);">${item.libelle}</div>${item.client?`<div style="font-size:0.72rem;color:var(--sepia);font-style:italic;">${item.client}${item.dossier?" — "+item.dossier:""}</div>`:""}</td>
+      <td><span class="tag">${item.categorie||"—"}</span></td>
+      <td style="font-size:0.8rem;color:var(--ink-faded);">${item.client||"—"}</td>
+      <td style="font-weight:600;font-size:0.8rem;color:${item.type==="recette"?"#2a4a10":"var(--bordeaux-dark)"};">${item.type==="recette"?"▲ Recette":"▼ Dépense"}</td>
+      <td style="font-family:'IM Fell English SC',serif;font-size:0.95rem;color:${item.type==="recette"?"#2a4a10":"var(--bordeaux-dark)"};font-weight:600;">${item.type==="recette"?"+":"-"}$${parseFloat(item.montant||0).toLocaleString("fr-FR",{minimumFractionDigits:2})}</td>
+      <td><span class="badge ${sBadge(item.status)}">${item.status||"—"}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary btn-icon" onclick="editItem('${item.id}')">✏️</button>
+        <button class="btn btn-sm btn-danger btn-icon" onclick="deleteItem('${item.id}')">🗑</button>
+      </td>
+    </tr>`).join("");
+};
+window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="💰 Inscription d'une Opération";["libelle","montant","client","dossier","notes"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-date").value=new Date().toISOString().slice(0,10);document.getElementById("f-type").value="recette";document.getElementById("modalOverlay").classList.add("open");};
+window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
+window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier l'Opération";["libelle","montant","client","dossier","notes"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-type").value=d.type||"recette";document.getElementById("f-categorie").value=d.categorie||"Honoraires";document.getElementById("f-date").value=d.date||"";document.getElementById("f-mode").value=d.mode||"Espèces";document.getElementById("f-status").value=d.status||"Réglé";document.getElementById("modalOverlay").classList.add("open");};
+window.saveOp=async function(){
+  const libelle=document.getElementById("f-libelle").value.trim();const montant=document.getElementById("f-montant").value;
+  if(!libelle||!montant){showToast("Libellé et montant obligatoires.");return;}
+  const data={libelle,type:document.getElementById("f-type").value,categorie:document.getElementById("f-categorie").value,montant:parseFloat(montant),date:document.getElementById("f-date").value,client:document.getElementById("f-client").value.trim(),dossier:document.getElementById("f-dossier").value.trim(),mode:document.getElementById("f-mode").value,status:document.getElementById("f-status").value,notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
+  try{if(editId){await updateDoc(doc(db,"comptabilite",editId),data);showToast("Opération mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"comptabilite"),data);showToast("Opération inscrite.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
+};
+window.deleteItem=async function(id){if(!confirm("Supprimer cette opération ?"))return;await deleteDoc(doc(db,"comptabilite",id));showToast("Opération supprimée.");};
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
+function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
+window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
+</script>
+</body>
+</html>

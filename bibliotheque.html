@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bibliothèque Juridique — Grassoni & Associates</title>
+  <link rel="stylesheet" href="shared.css"/>
+</head>
+<body>
+<div id="loading-overlay"><div style="font-size:2.2rem">📚</div><div class="lo-spinner"></div><div class="lo-text">Consultation de la Bibliothèque…</div></div>
+<div id="sidebar"></div>
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title">Grassoni & Associates — Bibliothèque Juridique</div>
+    <div class="topbar-date" id="topbarDate"></div>
+  </div>
+  <div class="page-content">
+    <div class="page-header">
+      <div><h1>Bibliothèque Juridique</h1><div class="subtitle">Références législatives, jurisprudences et ouvrages de droit en vigueur</div></div>
+      <button class="btn btn-primary" onclick="openModal()">📚 Ajouter une Référence</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><span class="stat-icon">📚</span><div class="stat-number" id="sb-total">0</div><div class="stat-label">Références</div></div>
+      <div class="stat-card"><span class="stat-icon">⚖</span><div class="stat-number" id="sb-loi">0</div><div class="stat-label">Textes de Loi</div></div>
+      <div class="stat-card"><span class="stat-icon">📋</span><div class="stat-number" id="sb-juris">0</div><div class="stat-label">Jurisprudences</div></div>
+      <div class="stat-card"><span class="stat-icon">📖</span><div class="stat-number" id="sb-ouvrage">0</div><div class="stat-label">Ouvrages</div></div>
+    </div>
+
+    <!-- Category tabs -->
+    <div style="display:flex;gap:0.5rem;margin-bottom:1.2rem;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" onclick="setFilter('')" id="tab-all">Tout</button>
+      <button class="btn btn-secondary btn-sm" onclick="setFilter('Texte de loi')" id="tab-loi">⚖ Lois</button>
+      <button class="btn btn-secondary btn-sm" onclick="setFilter('Jurisprudence')" id="tab-juris">📋 Jurisprudences</button>
+      <button class="btn btn-secondary btn-sm" onclick="setFilter('Ouvrage juridique')" id="tab-ouvrage">📖 Ouvrages</button>
+      <button class="btn btn-secondary btn-sm" onclick="setFilter('Doctrine')" id="tab-doctrine">✍ Doctrine</button>
+      <button class="btn btn-secondary btn-sm" onclick="setFilter('Code')" id="tab-code">📜 Codes</button>
+    </div>
+
+    <div class="search-bar">
+      <input class="search-input" id="searchInput" placeholder="Rechercher dans la bibliothèque…" oninput="renderCards()"/>
+    </div>
+
+    <div id="bibCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1.2rem;"></div>
+    <div class="empty-state" id="emptyState" style="display:none;">— Aucune référence dans la bibliothèque —</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">📚 Ajout d'une Référence Juridique</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full"><label class="form-label">Titre / Intitulé *</label><input class="form-input" id="f-titre" placeholder="ex: Code Civil de l'État de Lemoyne, Art. 742…"/></div>
+        <div class="form-group"><label class="form-label">Catégorie *</label>
+          <select class="form-select" id="f-categorie"><option>Texte de loi</option><option>Jurisprudence</option><option>Ouvrage juridique</option><option>Doctrine</option><option>Code</option><option>Traité</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Domaine Juridique</label>
+          <select class="form-select" id="f-domaine"><option>Droit civil</option><option>Droit pénal</option><option>Droit foncier</option><option>Droit commercial</option><option>Droit successoral</option><option>Droit notarial</option><option>Droit de la famille</option><option>Droit public</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Auteur / Juridiction</label><input class="form-input" id="f-auteur" placeholder="ex: Cour Suprême de Lemoyne, Prof. Dupont…"/></div>
+        <div class="form-group"><label class="form-label">Date / Année</label><input class="form-input" id="f-annee" placeholder="ex: 1892, 15 mars 1899…"/></div>
+        <div class="form-group"><label class="form-label">Référence / Cote</label><input class="form-input" id="f-reference" placeholder="ex: Art. 742, Arrêt n°1204…"/></div>
+        <div class="form-group"><label class="form-label">Localisation (rayon/étagère)</label><input class="form-input" id="f-localisation" placeholder="ex: Rayon III, Shelf B…"/></div>
+        <div class="form-group full"><label class="form-label">Résumé & Contenu Principal</label><textarea class="form-textarea" id="f-resume" style="min-height:120px;" placeholder="Résumé de la disposition, du raisonnement juridique ou du contenu de l'ouvrage…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Extraits & Citations Notables</label><textarea class="form-textarea" id="f-extraits" placeholder="Passages particulièrement pertinents pour les affaires du cabinet…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Dossiers Liés</label><input class="form-input" id="f-dossiers" placeholder="Références aux dossiers où ce texte est invoqué…"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveRef()">📚 Cataloguer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal" style="max-width:660px;">
+    <div class="modal-header"><span class="modal-title">📖 Référence Juridique</span><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeDetail()">Fermer</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
+const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
+let items=[],editId=null,activeFilter="";
+
+// Pre-load classic legal references
+const DEFAULTS=[
+  {titre:"Code Civil de Lemoyne — Propriété & Successions",categorie:"Code",domaine:"Droit civil",auteur:"Assemblée Législative de Lemoyne",annee:"1878",reference:"Art. 1-450",resume:"Corpus principal régissant la propriété privée, les successions ab intestat et testamentaires, et les régimes matrimoniaux dans le territoire de Lemoyne.",extraits:"Art. 54 : Nul ne peut être contraint de céder sa propriété si ce n'est pour cause d'utilité publique, et moyennant une juste et préalable indemnité.",dossiers:"",localisation:"Rayon I, Shelf A"},
+  {titre:"Arrêt Dawson c/ État de West Elizabeth (1891)",categorie:"Jurisprudence",domaine:"Droit foncier",auteur:"Cour Suprême de West Elizabeth",annee:"1891",reference:"WE-SUP-1891-204",resume:"Arrêt fondateur sur les droits miniers et l'exploitation des ressources naturelles sur terrains privés. La Cour décide que le propriétaire d'un terrain ne détient pas automatiquement les droits sur le sous-sol.",extraits:"«Le droit de propriété en surface ne saurait s'étendre aux richesses minérales sans titre spécifique reconnu par l'administration.»",dossiers:"",localisation:"Rayon II, Shelf C"},
+  {titre:"Traité de Droit Pénal des Territoires — Van Horn",categorie:"Ouvrage juridique",domaine:"Droit pénal",auteur:"Professeur Elias Van Horn",annee:"1887",reference:"ISBN 1887-VH-003",resume:"Ouvrage de référence sur le droit pénal applicable dans les territoires de l'Ouest. Traite notamment des questions de légitime défense, brigandage organisé et compétences juridictionnelles.",extraits:"",dossiers:"",localisation:"Rayon III, Shelf B"},
+  {titre:"Loi sur les Sociétés Commerciales de 1896",categorie:"Texte de loi",domaine:"Droit commercial",auteur:"Congrès Fédéral",annee:"1896",reference:"L.1896-COM-07",resume:"Loi fédérale encadrant la constitution, l'administration et la dissolution des sociétés commerciales dans l'ensemble des territoires.",extraits:"Section 3 : Toute société doit être constituée par acte notarié et inscrite au registre de commerce compétent dans les 30 jours suivant sa formation.",dossiers:"",localisation:"Rayon I, Shelf D"}
+];
+
+onAuthStateChanged(auth,async user=>{
+  if(!user){window.location.href="login.html";return;}
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
+  buildSidebar(p,"bibliotheque.html");setDate();listen();
+  document.getElementById("loading-overlay").style.display="none";
+});
+
+function listen(){
+  onSnapshot(query(collection(db,"bibliotheque"),orderBy("createdAt","desc")),snap=>{
+    const firestoreItems=snap.docs.map(d=>({id:d.id,...d.data(),_source:"db"}));
+    // Merge defaults (shown if db empty per category)
+    if(firestoreItems.length===0){
+      items=DEFAULTS.map((d,i)=>({id:"default-"+i,...d,_source:"default",createdAt:"1900-01-01"}));
+    } else {
+      items=firestoreItems;
+    }
+    updateStats();renderCards();
+  });
+}
+function updateStats(){
+  document.getElementById("sb-total").textContent=items.length;
+  document.getElementById("sb-loi").textContent=items.filter(i=>i.categorie==="Texte de loi"||i.categorie==="Code").length;
+  document.getElementById("sb-juris").textContent=items.filter(i=>i.categorie==="Jurisprudence").length;
+  document.getElementById("sb-ouvrage").textContent=items.filter(i=>i.categorie==="Ouvrage juridique"||i.categorie==="Traité").length;
+}
+
+window.setFilter=function(f){
+  activeFilter=f;
+  document.querySelectorAll("[id^='tab-']").forEach(b=>b.className="btn btn-secondary btn-sm");
+  const map={"":"tab-all","Texte de loi":"tab-loi","Jurisprudence":"tab-juris","Ouvrage juridique":"tab-ouvrage","Doctrine":"tab-doctrine","Code":"tab-code"};
+  if(map[f]) document.getElementById(map[f]).className="btn btn-primary btn-sm";
+  renderCards();
+};
+
+const ICONS={Testament:"📜","Texte de loi":"⚖","Jurisprudence":"📋","Ouvrage juridique":"📖",Code:"📜",Doctrine:"✍",Traité:"📗",Autre:"📄"};
+const COLORS={"Droit civil":"#4a7a2a","Droit pénal":"#6b1a1a","Droit foncier":"#7a5c2e","Droit commercial":"#1a3a6a","Droit successoral":"#5a1a6a","Droit notarial":"#8a4a1a","Autre":"#5a5a5a"};
+
+window.renderCards=function(){
+  const q=document.getElementById("searchInput").value.toLowerCase();
+  let list=items.filter(i=>{
+    const t=`${i.titre} ${i.auteur} ${i.domaine} ${i.reference}`.toLowerCase();
+    return(!q||t.includes(q))&&(!activeFilter||i.categorie===activeFilter);
+  });
+  document.getElementById("emptyState").style.display=list.length?"none":"block";
+  document.getElementById("bibCards").innerHTML=list.map(item=>`
+    <div style="background:white;border:1px solid var(--parchment-dark);border-top:3px solid ${COLORS[item.domaine]||"#5a5a5a"};padding:1.1rem;position:relative;cursor:pointer;" onclick="viewItem('${item.id}')">
+      <div style="display:flex;align-items:flex-start;gap:0.7rem;margin-bottom:0.6rem;">
+        <span style="font-size:1.5rem;flex-shrink:0;">${ICONS[item.categorie]||"📄"}</span>
+        <div>
+          <div style="font-family:'IM Fell English SC',serif;font-size:0.88rem;color:var(--bordeaux-dark);line-height:1.3;">${item.titre}</div>
+          ${item.auteur?`<div style="font-size:0.72rem;color:var(--sepia);font-style:italic;margin-top:0.15rem;">${item.auteur}</div>`:""}
+        </div>
+      </div>
+      <div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.6rem;">
+        <span class="tag">${item.categorie||"—"}</span>
+        <span class="tag" style="border-color:${COLORS[item.domaine]||"var(--parchment-dark)"};color:${COLORS[item.domaine]||"var(--sepia)"};">${item.domaine||"—"}</span>
+        ${item.annee?`<span class="tag">${item.annee}</span>`:""}
+      </div>
+      ${item.resume?`<p style="font-size:0.82rem;color:var(--ink-faded);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${item.resume}</p>`:""}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.8rem;padding-top:0.6rem;border-top:1px dashed var(--parchment-dark);">
+        <span style="font-size:0.68rem;color:var(--sepia);font-family:'IM Fell English SC',serif;">${item.reference||""}</span>
+        <div style="display:flex;gap:0.3rem;" onclick="event.stopPropagation()">
+          ${item._source!=="default"?`<button class="btn btn-sm btn-secondary btn-icon" onclick="editItem('${item.id}')">✏️</button><button class="btn btn-sm btn-danger btn-icon" onclick="deleteItem('${item.id}')">🗑</button>`:""}
+        </div>
+      </div>
+    </div>`).join("");
+};
+
+window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="📚 Ajout d'une Référence";["titre","auteur","annee","reference","localisation","resume","extraits","dossiers"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("modalOverlay").classList.add("open");};
+window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
+window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d||d._source==="default")return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier la Référence";["titre","auteur","annee","reference","localisation","resume","extraits","dossiers"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-categorie").value=d.categorie||"Texte de loi";document.getElementById("f-domaine").value=d.domaine||"Droit civil";document.getElementById("modalOverlay").classList.add("open");};
+window.saveRef=async function(){
+  const titre=document.getElementById("f-titre").value.trim();if(!titre){showToast("Le titre est obligatoire.");return;}
+  const data={titre,categorie:document.getElementById("f-categorie").value,domaine:document.getElementById("f-domaine").value,auteur:document.getElementById("f-auteur").value.trim(),annee:document.getElementById("f-annee").value.trim(),reference:document.getElementById("f-reference").value.trim(),localisation:document.getElementById("f-localisation").value.trim(),resume:document.getElementById("f-resume").value.trim(),extraits:document.getElementById("f-extraits").value.trim(),dossiers:document.getElementById("f-dossiers").value.trim(),updatedAt:new Date().toISOString()};
+  try{if(editId){await updateDoc(doc(db,"bibliotheque",editId),data);showToast("Référence mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"bibliotheque"),data);showToast("Référence cataloguée.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
+};
+window.deleteItem=async function(id){if(!confirm("Supprimer cette référence ?"))return;await deleteDoc(doc(db,"bibliotheque",id));showToast("Référence supprimée.");};
+window.viewItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;
+  document.getElementById("detailBody").innerHTML=`
+    <div style="margin-bottom:1rem;"><div style="font-family:'IM Fell English SC',serif;font-size:1.1rem;color:var(--bordeaux-dark);line-height:1.3;">${d.titre}</div>
+    <div style="margin-top:0.4rem;"><span class="tag">${d.categorie}</span> <span class="tag">${d.domaine}</span> ${d.annee?`<span class="tag">${d.annee}</span>`:""}</div></div>
+    <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
+      ${row("Auteur / Juridiction",d.auteur)}${row("Référence / Cote",d.reference)}${row("Localisation",d.localisation)}${row("Dossiers Liés",d.dossiers)}
+    </table>
+    ${d.resume?`<div class="divider-ornament"><span class="ornament-text">RÉSUMÉ</span></div><p style="font-size:0.9rem;color:var(--ink-faded);line-height:1.7;">${d.resume}</p>`:""}
+    ${d.extraits?`<div class="divider-ornament"><span class="ornament-text">EXTRAITS NOTABLES</span></div><blockquote style="border-left:3px solid var(--sepia);padding-left:1rem;font-style:italic;font-size:0.9rem;color:var(--ink-faded);line-height:1.7;">${d.extraits}</blockquote>`:""}`;
+  document.getElementById("detailOverlay").classList.add("open");
+};
+function row(l,v){return v?`<tr><td style="font-family:'IM Fell English SC',serif;font-size:0.63rem;letter-spacing:0.1em;color:var(--sepia);padding:0.3rem 0.4rem 0.3rem 0;width:38%;border-bottom:1px dashed var(--parchment-dark);">${l}</td><td style="padding:0.3rem 0;border-bottom:1px dashed var(--parchment-dark);color:var(--ink-faded);">${v}</td></tr>`:""; }
+window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove("open");
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
+function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
+window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
+</script>
+</body>
+</html>

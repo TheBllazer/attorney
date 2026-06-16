@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bureau Notarial — Grassoni & Associates</title>
+  <link rel="stylesheet" href="shared.css"/>
+</head>
+<body>
+<div id="loading-overlay"><div style="font-size:2.2rem">✒️</div><div class="lo-spinner"></div><div class="lo-text">Consultation du Bureau Notarial…</div></div>
+<div id="sidebar"></div>
+<div id="main">
+  <div class="topbar">
+    <div class="topbar-title">Grassoni & Associates — Bureau Notarial</div>
+    <div class="topbar-date" id="topbarDate"></div>
+  </div>
+  <div class="page-content">
+    <div class="page-header">
+      <div><h1>Bureau Notarial</h1><div class="subtitle">Actes authentiques, testaments, procurations et actes de mariage</div></div>
+      <button class="btn btn-primary" onclick="openModal()">✒️ Rédiger un Acte</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><span class="stat-icon">✒️</span><div class="stat-number" id="sn-total">0</div><div class="stat-label">Actes Rédigés</div></div>
+      <div class="stat-card"><span class="stat-icon">📜</span><div class="stat-number" id="sn-testament">0</div><div class="stat-label">Testaments</div></div>
+      <div class="stat-card"><span class="stat-icon">🤝</span><div class="stat-number" id="sn-contrat">0</div><div class="stat-label">Contrats</div></div>
+      <div class="stat-card"><span class="stat-icon">💍</span><div class="stat-number" id="sn-mariage">0</div><div class="stat-label">Actes de Mariage</div></div>
+    </div>
+    <div class="panel">
+      <div class="search-bar">
+        <input class="search-input" id="searchInput" placeholder="Rechercher par type d'acte, partie, notaire…" oninput="renderTable()"/>
+        <select class="form-select" id="filterType" onchange="renderTable()" style="width:185px;">
+          <option value="">Tous types d'actes</option>
+          <option>Testament</option><option>Procuration</option><option>Acte de vente</option>
+          <option>Contrat de mariage</option><option>Acte de mariage</option><option>Donation</option>
+          <option>Acte de société</option><option>Reconnaissance de dette</option><option>Autre</option>
+        </select>
+      </div>
+      <table class="reg-table">
+        <thead><tr><th>N° Acte</th><th>Type</th><th>Partie Principale</th><th>Partie Secondaire</th><th>Notaire</th><th>Date</th><th>Statut</th><th>Actions</th></tr></thead>
+        <tbody id="notariatTbody"></tbody>
+      </table>
+      <div class="empty-state" id="emptyState" style="display:none;">— Aucun acte notarié dans ce registre —</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">✒️ Rédaction d'un Acte Notarié</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Type d'Acte *</label>
+          <select class="form-select" id="f-type"><option>Testament</option><option>Procuration</option><option>Acte de vente</option><option>Contrat de mariage</option><option>Acte de mariage</option><option>Donation</option><option>Acte de société</option><option>Reconnaissance de dette</option><option>Autre</option></select></div>
+        <div class="form-group"><label class="form-label">Statut</label>
+          <select class="form-select" id="f-status"><option>Signé & authentifié</option><option>En cours de rédaction</option><option>Révoqué</option><option>En litige</option></select></div>
+        <div class="form-group"><label class="form-label">Partie Principale (Testateur/Vendeur…) *</label><input class="form-input" id="f-partie1" placeholder="Nom complet"/></div>
+        <div class="form-group"><label class="form-label">Partie Secondaire (Héritier/Acheteur…)</label><input class="form-input" id="f-partie2" placeholder="Nom complet"/></div>
+        <div class="form-group"><label class="form-label">Notaire Instrumentant</label><input class="form-input" id="f-notaire" placeholder="Maître Grassoni…"/></div>
+        <div class="form-group"><label class="form-label">Date de l'Acte</label><input class="form-input" type="date" id="f-date"/></div>
+        <div class="form-group"><label class="form-label">Lieu de Signature</label><input class="form-input" id="f-lieu" placeholder="ex: Étude Saint Denis"/></div>
+        <div class="form-group"><label class="form-label">Valeur de l'Acte ($)</label><input class="form-input" type="number" id="f-valeur" placeholder="0.00"/></div>
+        <div class="form-group full"><label class="form-label">Témoins</label><input class="form-input" id="f-temoins" placeholder="Témoin 1 ; Témoin 2 ; …"/></div>
+        <div class="form-group full"><label class="form-label">Contenu & Dispositions de l'Acte</label><textarea class="form-textarea" id="f-contenu" style="min-height:140px;" placeholder="Rédigez ici les dispositions, clauses et conditions de l'acte notarié. Par-devant Maître Grassoni, notaire soussigné, ont comparu…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Biens & Objets Désignés</label><textarea class="form-textarea" id="f-biens" placeholder="Description des biens, propriétés, montants ou droits concernés…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Notes Internes</label><textarea class="form-textarea" id="f-notes" placeholder="Observations confidentielles du notaire…"></textarea></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveActe()">✒️ Authentifier l'Acte</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="detailOverlay">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header"><span class="modal-title">📜 Acte Notarié</span><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeDetail()">Fermer</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
+const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
+let items=[],editId=null;
+onAuthStateChanged(auth,async user=>{
+  if(!user){window.location.href="login.html";return;}
+  const snap=await getDoc(doc(db,"users",user.uid));
+  const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
+  buildSidebar(p,"notariat.html");setDate();listen();
+  document.getElementById("loading-overlay").style.display="none";
+});
+function listen(){
+  onSnapshot(query(collection(db,"actes"),orderBy("createdAt","desc")),snap=>{
+    items=snap.docs.map(d=>({id:d.id,...d.data()}));
+    document.getElementById("sn-total").textContent=items.length;
+    document.getElementById("sn-testament").textContent=items.filter(i=>i.type==="Testament").length;
+    document.getElementById("sn-contrat").textContent=items.filter(i=>["Acte de vente","Acte de société","Reconnaissance de dette"].includes(i.type)).length;
+    document.getElementById("sn-mariage").textContent=items.filter(i=>i.type==="Acte de mariage"||i.type==="Contrat de mariage").length;
+    renderTable();
+  });
+}
+window.renderTable=function(){
+  const q=document.getElementById("searchInput").value.toLowerCase();
+  const ft=document.getElementById("filterType").value;
+  let list=items.filter(i=>{
+    const t=`${i.type} ${i.partie1} ${i.partie2} ${i.notaire}`.toLowerCase();
+    return(!q||t.includes(q))&&(!ft||i.type===ft);
+  });
+  document.getElementById("emptyState").style.display=list.length?"none":"block";
+  const sBadge=s=>s==="Signé & authentifié"?"badge-active":s==="En cours de rédaction"?"badge-pending":s==="En litige"?"badge-urgent":"badge-closed";
+  document.getElementById("notariatTbody").innerHTML=list.map((item,i)=>`
+    <tr>
+      <td style="font-family:'IM Fell English SC',serif;font-size:0.68rem;color:var(--sepia);">NOT-${String(i+1).padStart(4,"0")}</td>
+      <td><span class="tag">${item.type||"—"}</span></td>
+      <td style="font-weight:600;color:var(--ink);">${item.partie1||"—"}</td>
+      <td style="color:var(--ink-faded);">${item.partie2||"—"}</td>
+      <td style="font-size:0.8rem;font-style:italic;">${item.notaire||"—"}</td>
+      <td style="font-size:0.75rem;color:var(--sepia);">${item.date||"—"}</td>
+      <td><span class="badge ${sBadge(item.status)}">${item.status||"—"}</span></td>
+      <td>
+        <button class="btn btn-sm btn-secondary btn-icon" onclick="viewItem('${item.id}')">🔍</button>
+        <button class="btn btn-sm btn-secondary btn-icon" onclick="editItem('${item.id}')">✏️</button>
+        <button class="btn btn-sm btn-danger btn-icon" onclick="deleteItem('${item.id}')">🗑</button>
+      </td>
+    </tr>`).join("");
+};
+window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="✒️ Rédaction d'un Acte Notarié";["partie1","partie2","notaire","lieu","valeur","temoins","contenu","biens","notes"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-date").value=new Date().toISOString().slice(0,10);document.getElementById("modalOverlay").classList.add("open");};
+window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
+window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier l'Acte";["partie1","partie2","notaire","lieu","valeur","temoins","contenu","biens","notes"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-type").value=d.type||"Testament";document.getElementById("f-status").value=d.status||"Signé & authentifié";document.getElementById("f-date").value=d.date||"";document.getElementById("modalOverlay").classList.add("open");};
+window.saveActe=async function(){
+  const partie1=document.getElementById("f-partie1").value.trim();if(!partie1){showToast("La partie principale est obligatoire.");return;}
+  const data={type:document.getElementById("f-type").value,status:document.getElementById("f-status").value,partie1,partie2:document.getElementById("f-partie2").value.trim(),notaire:document.getElementById("f-notaire").value.trim(),date:document.getElementById("f-date").value,lieu:document.getElementById("f-lieu").value.trim(),valeur:document.getElementById("f-valeur").value,temoins:document.getElementById("f-temoins").value.trim(),contenu:document.getElementById("f-contenu").value.trim(),biens:document.getElementById("f-biens").value.trim(),notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
+  try{if(editId){await updateDoc(doc(db,"actes",editId),data);showToast("Acte mis à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"actes"),data);showToast("Acte notarié enregistré.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
+};
+window.deleteItem=async function(id){if(!confirm("Supprimer cet acte notarié ?"))return;await deleteDoc(doc(db,"actes",id));showToast("Acte supprimé.");};
+window.viewItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;
+  const sBadge=s=>s==="Signé & authentifié"?"badge-active":s==="En cours de rédaction"?"badge-pending":s==="En litige"?"badge-urgent":"badge-closed";
+  document.getElementById("detailBody").innerHTML=`
+    <div style="text-align:center;margin-bottom:1.2rem;padding:1rem;background:rgba(107,26,26,0.05);border:1px solid var(--parchment-dark);">
+      <div style="font-size:2rem;margin-bottom:0.3rem;">📜</div>
+      <div style="font-family:'IM Fell English SC',serif;font-size:1.1rem;color:var(--bordeaux-dark);">ACTE NOTARIÉ</div>
+      <span class="tag">${d.type}</span> <span class="badge ${sBadge(d.status)}">${d.status}</span>
+    </div>
+    <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
+      ${row("Partie Principale",d.partie1)}${row("Partie Secondaire",d.partie2)}${row("Notaire",d.notaire)}
+      ${row("Date",d.date)}${row("Lieu",d.lieu)}${row("Valeur",d.valeur?"$"+parseFloat(d.valeur).toLocaleString():"")}
+      ${row("Témoins",d.temoins)}
+    </table>
+    ${d.contenu?`<div class="divider-ornament"><span class="ornament-text">DISPOSITIONS DE L'ACTE</span></div><div style="font-size:0.9rem;color:var(--ink-faded);line-height:1.8;font-style:italic;background:rgba(245,238,220,0.7);padding:1rem;border-left:3px solid var(--sepia);">${d.contenu}</div>`:""}
+    ${d.biens?`<div class="divider-ornament"><span class="ornament-text">BIENS DÉSIGNÉS</span></div><p style="font-size:0.88rem;color:var(--ink-faded);">${d.biens}</p>`:""}
+    ${d.notes?`<div class="divider-ornament"><span class="ornament-text">NOTES INTERNES</span></div><p style="font-size:0.85rem;color:var(--ink-faded);font-style:italic;">${d.notes}</p>`:""}`;
+  document.getElementById("detailOverlay").classList.add("open");
+};
+function row(l,v){return v?`<tr><td style="font-family:'IM Fell English SC',serif;font-size:0.63rem;letter-spacing:0.1em;color:var(--sepia);padding:0.3rem 0.4rem 0.3rem 0;width:38%;border-bottom:1px dashed var(--parchment-dark);">${l}</td><td style="padding:0.3rem 0;border-bottom:1px dashed var(--parchment-dark);color:var(--ink-faded);">${v}</td></tr>`:""; }
+window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove("open");
+function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
+function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
+window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
+</script>
+</body>
+</html>
