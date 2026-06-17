@@ -54,7 +54,7 @@
       <table class="reg-table" id="clientTable">
         <thead>
           <tr>
-            <th>N° Dossier</th>
+            <th>N° Client</th>
             <th>Nom & Prénom / Raison Sociale</th>
             <th>Type</th>
             <th>Ville</th>
@@ -80,6 +80,11 @@
     </div>
     <div class="modal-body">
       <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">N° de Client (Personnalisé) *</label>
+          <input class="form-input" id="f-numero" placeholder="ex: CLI-A.MORGAN-01"/>
+          <small style="color:var(--sepia);font-style:italic;font-size:0.7rem;">Identifiant unique — utilisé dans tous les registres du cabinet</small>
+        </div>
         <div class="form-group">
           <label class="form-label">Nom de Famille / Raison Sociale *</label>
           <input class="form-input" id="f-nom" placeholder="ex: Calloway"/>
@@ -138,7 +143,7 @@
         </div>
         <div class="form-group full">
           <label class="form-label">Notes Confidentielles</label>
-          <textarea class="form-textarea" id="f-notes" placeholder="Observations particulières, antécédents, relations…"></textarea>
+          <div id="rte-notes"></div>
         </div>
         <div class="form-group full">
           <label class="form-label">Photo / Portrait (URL Postimage)</label>
@@ -170,6 +175,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -219,14 +225,14 @@ window.renderTable = function() {
   const ft = document.getElementById("filterType").value;
   const fs = document.getElementById("filterStatus").value;
   let list = clients.filter(c => {
-    const name = `${c.nom} ${c.prenom||""} ${c.ville||""} ${c.status||""}`.toLowerCase();
+    const name = `${c.numero||""} ${c.nom} ${c.prenom||""} ${c.ville||""} ${c.status||""}`.toLowerCase();
     return (!q || name.includes(q)) && (!ft || c.type===ft) && (!fs || c.status===fs);
   });
   const tbody = document.getElementById("clientTbody");
   document.getElementById("emptyState").style.display = list.length ? "none" : "block";
   tbody.innerHTML = list.map((c,i) => `
     <tr>
-      <td style="font-family:'IM Fell English SC',serif;font-size:0.7rem;color:var(--sepia);">CLI-${String(i+1).padStart(4,"0")}</td>
+      <td style="font-family:'IM Fell English SC',serif;font-size:0.7rem;color:var(--sepia);">${c.numero||"—"}</td>
       <td>
         <div style="display:flex;align-items:center;gap:0.5rem;">
           ${c.photoURL ? `<img src="${c.photoURL}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--sepia);" onerror="this.style.display='none'"/>` : '<span style="font-size:1.1rem">👤</span>'}
@@ -252,10 +258,11 @@ window.renderTable = function() {
 window.openModal = function() {
   editId = null;
   document.getElementById("modalTitle").textContent = "✒ Enregistrement d'un Nouveau Client";
-  ["nom","prenom","ville","profession","contact","adresse","notes","photo"].forEach(f => document.getElementById("f-"+f).value="");
+  ["numero","nom","prenom","ville","profession","contact","adresse","photo"].forEach(f => document.getElementById("f-"+f).value="");
   document.getElementById("f-type").value = "Personne physique";
   document.getElementById("f-status").value = "Actif";
   document.getElementById("f-territoire").value = "Lemoyne";
+  GrassoniWidgets.initRTE("rte-notes", "Observations particulières, antécédents, relations…");
   document.getElementById("modalOverlay").classList.add("open");
 };
 window.closeModal = () => document.getElementById("modalOverlay").classList.remove("open");
@@ -264,6 +271,7 @@ window.editClient = function(id) {
   const c = clients.find(x=>x.id===id); if(!c) return;
   editId = id;
   document.getElementById("modalTitle").textContent = "✏️ Modifier la Fiche Client";
+  document.getElementById("f-numero").value = c.numero||"";
   document.getElementById("f-nom").value = c.nom||"";
   document.getElementById("f-prenom").value = c.prenom||"";
   document.getElementById("f-type").value = c.type||"Personne physique";
@@ -273,16 +281,22 @@ window.editClient = function(id) {
   document.getElementById("f-profession").value = c.profession||"";
   document.getElementById("f-contact").value = c.contact||"";
   document.getElementById("f-adresse").value = c.adresse||"";
-  document.getElementById("f-notes").value = c.notes||"";
   document.getElementById("f-photo").value = c.photoURL||"";
+  GrassoniWidgets.initRTE("rte-notes", "Observations particulières, antécédents, relations…");
+  GrassoniWidgets.setRTEValue("rte-notes", c.notes||"");
   document.getElementById("modalOverlay").classList.add("open");
 };
 
 window.saveClient = async function() {
   const nom = document.getElementById("f-nom").value.trim();
+  const numero = document.getElementById("f-numero").value.trim();
   if(!nom){showToast("Le nom est obligatoire."); return;}
+  if(!numero){showToast("Le N° de client est obligatoire."); return;}
+  // Check uniqueness of custom client number
+  const duplicate = clients.find(c => c.numero === numero && c.id !== editId);
+  if(duplicate){showToast("Ce N° de client existe déjà. Choisissez-en un autre."); return;}
   const data = {
-    nom, prenom:document.getElementById("f-prenom").value.trim(),
+    numero, nom, prenom:document.getElementById("f-prenom").value.trim(),
     type:document.getElementById("f-type").value,
     status:document.getElementById("f-status").value,
     ville:document.getElementById("f-ville").value.trim(),
@@ -290,7 +304,7 @@ window.saveClient = async function() {
     profession:document.getElementById("f-profession").value.trim(),
     contact:document.getElementById("f-contact").value.trim(),
     adresse:document.getElementById("f-adresse").value.trim(),
-    notes:document.getElementById("f-notes").value.trim(),
+    notes:GrassoniWidgets.getRTEValue("rte-notes"),
     photoURL:document.getElementById("f-photo").value.trim(),
     updatedAt: new Date().toISOString()
   };
@@ -313,6 +327,7 @@ window.viewClient = function(id) {
     <div style="text-align:center;margin-bottom:1rem;">
       ${c.photoURL?`<img src="${c.photoURL}" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--sepia);margin-bottom:0.5rem;" onerror="this.style.display='none'"/>`:
       `<div style="font-size:3rem;">👤</div>`}
+      <div style="font-family:'IM Fell English SC',serif;font-size:0.7rem;color:var(--sepia);letter-spacing:0.08em;">${c.numero||""}</div>
       <div style="font-family:'IM Fell English SC',serif;font-size:1.1rem;color:var(--bordeaux-dark);">${c.nom}${c.prenom?" "+c.prenom:""}</div>
       <div style="font-style:italic;color:var(--sepia);font-size:0.85rem;">${c.profession||""}</div>
       <span class="badge ${c.status==="Actif"?"badge-active":c.status==="Litigieux"?"badge-urgent":"badge-closed"}" style="margin-top:0.4rem;">${c.status}</span>
@@ -344,7 +359,7 @@ function buildSidebar(profile, current) {
   const items=[
     {href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},
     {href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},
-    {href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},
+    {href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},
     {href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},
     {href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},
     {href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},

@@ -60,7 +60,7 @@
           <select class="form-select" id="f-type"><option>Civil</option><option>Pénal</option><option>Foncier</option><option>Commercial</option><option>Successoral</option><option>Notarial</option><option>Autre</option></select></div>
         <div class="form-group"><label class="form-label">Statut</label>
           <select class="form-select" id="f-status"><option>En cours</option><option>En attente</option><option>Clôturé</option><option>Urgent</option></select></div>
-        <div class="form-group"><label class="form-label">Client Principal</label><input class="form-input" id="f-client" placeholder="Nom du client"/></div>
+        <div class="form-group"><label class="form-label">Client Principal</label><input class="form-input" id="f-client" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Partie Adverse</label><input class="form-input" id="f-adverse" placeholder="Nom de la partie adverse"/></div>
         <div class="form-group"><label class="form-label">Juridiction</label>
           <select class="form-select" id="f-juridiction">
@@ -70,9 +70,9 @@
         <div class="form-group"><label class="form-label">Date d'Ouverture</label><input class="form-input" type="date" id="f-ouverture"/></div>
         <div class="form-group"><label class="form-label">Prochaine Audience</label><input class="form-input" type="date" id="f-audience"/></div>
         <div class="form-group"><label class="form-label">Honoraires Prévus ($)</label><input class="form-input" type="number" id="f-honoraires" placeholder="0.00"/></div>
-        <div class="form-group full"><label class="form-label">Description & Faits</label><textarea class="form-textarea" id="f-description" placeholder="Résumé des faits, contexte, prétentions des parties…" style="min-height:100px;"></textarea></div>
-        <div class="form-group full"><label class="form-label">Pièces & Documents</label><textarea class="form-textarea" id="f-pieces" placeholder="Liste des pièces jointes, actes, témoignages…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Notes Confidentielles</label><textarea class="form-textarea" id="f-notes" placeholder="Stratégie, observations internes…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Description & Faits</label><div id="rte-description"></div></div>
+        <div class="form-group full"><label class="form-label">Pièces & Documents</label><div id="rte-pieces"></div></div>
+        <div class="form-group full"><label class="form-label">Notes Confidentielles</label><div id="rte-notes"></div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -95,6 +95,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -102,15 +103,21 @@ import { getFirestore, collection, doc, getDoc, addDoc, updateDoc, deleteDoc, on
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC); const auth=getAuth(app); const db=getFirestore(app);
-let dossiers=[],editId=null;
+let dossiers=[],editId=null,clientsList=[];
 
 onAuthStateChanged(auth, async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"dossiers.html"); setDate(); listenDossiers();
+  buildSidebar(p,"dossiers.html"); setDate(); listenDossiers(); listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{
+    clientsList=snap.docs.map(d=>({id:d.id,...d.data()}));
+  });
+}
 
 function listenDossiers(){
   onSnapshot(query(collection(db,"dossiers"),orderBy("createdAt","desc")),snap=>{
@@ -138,7 +145,7 @@ window.renderTable=function(){
       <td style="font-family:'IM Fell English SC',serif;font-size:0.7rem;color:var(--sepia);">DOS-${String(i+1).padStart(4,"0")}</td>
       <td><div style="font-weight:600;color:var(--ink);max-width:200px;">${d.intitule}</div>${d.adverse?`<div style="font-size:0.72rem;color:var(--sepia);font-style:italic;">c/ ${d.adverse}</div>`:""}</td>
       <td><span class="tag">${d.type||"—"}</span></td>
-      <td>${d.client||"—"}</td>
+      <td>${d.clientNumero?`<span class="tag" style="margin-right:0.3rem;">${d.clientNumero}</span>`:""}${d.client||"—"}</td>
       <td style="font-size:0.78rem;color:var(--ink-faded);">${d.juridiction||"—"}</td>
       <td><span class="badge ${statusBadge(d.status)}">${d.status||"—"}</span></td>
       <td style="font-size:0.75rem;color:var(--sepia);">${d.ouverture||"—"}</td>
@@ -154,9 +161,15 @@ window.renderTable=function(){
 window.openModal=function(){
   editId=null;
   document.getElementById("modalTitle").textContent="📁 Ouverture d'un Nouveau Dossier";
-  ["intitule","client","adverse","avocat","honoraires","description","pieces","notes"].forEach(f=>document.getElementById("f-"+f).value="");
+  ["intitule","client","adverse","avocat","honoraires"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-client").dataset.clientId;
+  delete document.getElementById("f-client").dataset.clientNumero;
   document.getElementById("f-ouverture").value=new Date().toISOString().slice(0,10);
   document.getElementById("f-audience").value="";
+  GrassoniWidgets.initRTE("rte-description","Résumé des faits, contexte, prétentions des parties…");
+  GrassoniWidgets.initRTE("rte-pieces","Liste des pièces jointes, actes, témoignages…");
+  GrassoniWidgets.initRTE("rte-notes","Stratégie, observations internes…");
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
   document.getElementById("modalOverlay").classList.add("open");
 };
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
@@ -169,27 +182,35 @@ window.editDossier=function(id){
   document.getElementById("f-type").value=d.type||"Civil";
   document.getElementById("f-status").value=d.status||"En cours";
   document.getElementById("f-client").value=d.client||"";
+  if(d.clientId) document.getElementById("f-client").dataset.clientId=d.clientId;
+  if(d.clientNumero) document.getElementById("f-client").dataset.clientNumero=d.clientNumero;
   document.getElementById("f-adverse").value=d.adverse||"";
   document.getElementById("f-juridiction").value=d.juridiction||"Tribunal de Saint Denis";
   document.getElementById("f-avocat").value=d.avocat||"";
   document.getElementById("f-ouverture").value=d.ouverture||"";
   document.getElementById("f-audience").value=d.audience||"";
   document.getElementById("f-honoraires").value=d.honoraires||"";
-  document.getElementById("f-description").value=d.description||"";
-  document.getElementById("f-pieces").value=d.pieces||"";
-  document.getElementById("f-notes").value=d.notes||"";
+  GrassoniWidgets.initRTE("rte-description","Résumé des faits, contexte, prétentions des parties…");
+  GrassoniWidgets.setRTEValue("rte-description", d.description||"");
+  GrassoniWidgets.initRTE("rte-pieces","Liste des pièces jointes, actes, témoignages…");
+  GrassoniWidgets.setRTEValue("rte-pieces", d.pieces||"");
+  GrassoniWidgets.initRTE("rte-notes","Stratégie, observations internes…");
+  GrassoniWidgets.setRTEValue("rte-notes", d.notes||"");
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
   document.getElementById("modalOverlay").classList.add("open");
 };
 
 window.saveDossier=async function(){
   const intitule=document.getElementById("f-intitule").value.trim();
   if(!intitule){showToast("L'intitulé est obligatoire.");return;}
+  const clientField=document.getElementById("f-client");
   const data={intitule,type:document.getElementById("f-type").value,status:document.getElementById("f-status").value,
-    client:document.getElementById("f-client").value.trim(),adverse:document.getElementById("f-adverse").value.trim(),
+    client:clientField.value.trim(),clientId:clientField.dataset.clientId||"",clientNumero:clientField.dataset.clientNumero||"",
+    adverse:document.getElementById("f-adverse").value.trim(),
     juridiction:document.getElementById("f-juridiction").value,avocat:document.getElementById("f-avocat").value.trim(),
     ouverture:document.getElementById("f-ouverture").value,audience:document.getElementById("f-audience").value,
-    honoraires:document.getElementById("f-honoraires").value,description:document.getElementById("f-description").value.trim(),
-    pieces:document.getElementById("f-pieces").value.trim(),notes:document.getElementById("f-notes").value.trim(),
+    honoraires:document.getElementById("f-honoraires").value,description:GrassoniWidgets.getRTEValue("rte-description"),
+    pieces:GrassoniWidgets.getRTEValue("rte-pieces"),notes:GrassoniWidgets.getRTEValue("rte-notes"),
     updatedAt:new Date().toISOString()};
   try{
     if(editId){await updateDoc(doc(db,"dossiers",editId),data);showToast("Dossier mis à jour.");}
@@ -226,7 +247,7 @@ function showToast(msg){const t=document.getElementById("toast");t.textContent=m
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
 function buildSidebar(profile,current){
-  const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];
+  const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];
   let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});
   for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
   document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;

@@ -56,16 +56,16 @@
           <select class="form-select" id="f-type"><option>Testament</option><option>Procuration</option><option>Acte de vente</option><option>Contrat de mariage</option><option>Acte de mariage</option><option>Donation</option><option>Acte de société</option><option>Reconnaissance de dette</option><option>Autre</option></select></div>
         <div class="form-group"><label class="form-label">Statut</label>
           <select class="form-select" id="f-status"><option>Signé & authentifié</option><option>En cours de rédaction</option><option>Révoqué</option><option>En litige</option></select></div>
-        <div class="form-group"><label class="form-label">Partie Principale (Testateur/Vendeur…) *</label><input class="form-input" id="f-partie1" placeholder="Nom complet"/></div>
-        <div class="form-group"><label class="form-label">Partie Secondaire (Héritier/Acheteur…)</label><input class="form-input" id="f-partie2" placeholder="Nom complet"/></div>
+        <div class="form-group"><label class="form-label">Partie Principale (Testateur/Vendeur…) *</label><input class="form-input" id="f-partie1" placeholder="Rechercher dans le registre des clients…"/></div>
+        <div class="form-group"><label class="form-label">Partie Secondaire (Héritier/Acheteur…)</label><input class="form-input" id="f-partie2" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Notaire Instrumentant</label><input class="form-input" id="f-notaire" placeholder="Maître Grassoni…"/></div>
         <div class="form-group"><label class="form-label">Date de l'Acte</label><input class="form-input" type="date" id="f-date"/></div>
         <div class="form-group"><label class="form-label">Lieu de Signature</label><input class="form-input" id="f-lieu" placeholder="ex: Étude Saint Denis"/></div>
         <div class="form-group"><label class="form-label">Valeur de l'Acte ($)</label><input class="form-input" type="number" id="f-valeur" placeholder="0.00"/></div>
         <div class="form-group full"><label class="form-label">Témoins</label><input class="form-input" id="f-temoins" placeholder="Témoin 1 ; Témoin 2 ; …"/></div>
-        <div class="form-group full"><label class="form-label">Contenu & Dispositions de l'Acte</label><textarea class="form-textarea" id="f-contenu" style="min-height:140px;" placeholder="Rédigez ici les dispositions, clauses et conditions de l'acte notarié. Par-devant Maître Grassoni, notaire soussigné, ont comparu…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Biens & Objets Désignés</label><textarea class="form-textarea" id="f-biens" placeholder="Description des biens, propriétés, montants ou droits concernés…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Notes Internes</label><textarea class="form-textarea" id="f-notes" placeholder="Observations confidentielles du notaire…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Contenu & Dispositions de l'Acte</label><div id="rte-contenu"></div></div>
+        <div class="form-group full"><label class="form-label">Biens & Objets Désignés</label><div id="rte-biens"></div></div>
+        <div class="form-group full"><label class="form-label">Notes Internes</label><div id="rte-notes"></div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -79,25 +79,32 @@
   <div class="modal" style="max-width:680px;">
     <div class="modal-header"><span class="modal-title">📜 Acte Notarié</span><button class="modal-close" onclick="closeDetail()">✕</button></div>
     <div class="modal-body" id="detailBody"></div>
-    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeDetail()">Fermer</button></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="exportBtn" onclick="exportActe()">🖼 Exporter en PNG</button>
+      <button class="btn btn-secondary" onclick="closeDetail()">Fermer</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
-let items=[],editId=null;
+let items=[],editId=null,clientsList=[];
 onAuthStateChanged(auth,async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"notariat.html");setDate();listen();
+  buildSidebar(p,"notariat.html");setDate();listen();listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{ clientsList=snap.docs.map(d=>({id:d.id,...d.data()})); });
+}
 function listen(){
   onSnapshot(query(collection(db,"actes"),orderBy("createdAt","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -121,8 +128,8 @@ window.renderTable=function(){
     <tr>
       <td style="font-family:'IM Fell English SC',serif;font-size:0.68rem;color:var(--sepia);">NOT-${String(i+1).padStart(4,"0")}</td>
       <td><span class="tag">${item.type||"—"}</span></td>
-      <td style="font-weight:600;color:var(--ink);">${item.partie1||"—"}</td>
-      <td style="color:var(--ink-faded);">${item.partie2||"—"}</td>
+      <td style="font-weight:600;color:var(--ink);">${item.partie1||"—"}${item.partie1Numero?` <span class="tag">${item.partie1Numero}</span>`:""}</td>
+      <td style="color:var(--ink-faded);">${item.partie2||"—"}${item.partie2Numero?` <span class="tag">${item.partie2Numero}</span>`:""}</td>
       <td style="font-size:0.8rem;font-style:italic;">${item.notaire||"—"}</td>
       <td style="font-size:0.75rem;color:var(--sepia);">${item.date||"—"}</td>
       <td><span class="badge ${sBadge(item.status)}">${item.status||"—"}</span></td>
@@ -133,16 +140,58 @@ window.renderTable=function(){
       </td>
     </tr>`).join("");
 };
-window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="✒️ Rédaction d'un Acte Notarié";["partie1","partie2","notaire","lieu","valeur","temoins","contenu","biens","notes"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-date").value=new Date().toISOString().slice(0,10);document.getElementById("modalOverlay").classList.add("open");};
+window.openModal=function(){
+  editId=null;document.getElementById("modalTitle").textContent="✒️ Rédaction d'un Acte Notarié";
+  ["partie1","partie2","notaire","lieu","valeur","temoins"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-partie1").dataset.clientId; delete document.getElementById("f-partie1").dataset.clientNumero;
+  delete document.getElementById("f-partie2").dataset.clientId; delete document.getElementById("f-partie2").dataset.clientNumero;
+  document.getElementById("f-date").value=new Date().toISOString().slice(0,10);
+  GrassoniWidgets.initRTE("rte-contenu","Rédigez ici les dispositions, clauses et conditions de l'acte notarié. Par-devant Maître Grassoni, notaire soussigné, ont comparu…");
+  GrassoniWidgets.initRTE("rte-biens","Description des biens, propriétés, montants ou droits concernés…");
+  GrassoniWidgets.initRTE("rte-notes","Observations confidentielles du notaire…");
+  GrassoniWidgets.initClientPicker("f-partie1", ()=>clientsList);
+  GrassoniWidgets.initClientPicker("f-partie2", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
-window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier l'Acte";["partie1","partie2","notaire","lieu","valeur","temoins","contenu","biens","notes"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-type").value=d.type||"Testament";document.getElementById("f-status").value=d.status||"Signé & authentifié";document.getElementById("f-date").value=d.date||"";document.getElementById("modalOverlay").classList.add("open");};
+window.editItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier l'Acte";
+  ["partie1","partie2","notaire","lieu","valeur","temoins"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");
+  if(d.partie1Id) document.getElementById("f-partie1").dataset.clientId=d.partie1Id;
+  if(d.partie1Numero) document.getElementById("f-partie1").dataset.clientNumero=d.partie1Numero;
+  if(d.partie2Id) document.getElementById("f-partie2").dataset.clientId=d.partie2Id;
+  if(d.partie2Numero) document.getElementById("f-partie2").dataset.clientNumero=d.partie2Numero;
+  document.getElementById("f-type").value=d.type||"Testament";
+  document.getElementById("f-status").value=d.status||"Signé & authentifié";
+  document.getElementById("f-date").value=d.date||"";
+  GrassoniWidgets.initRTE("rte-contenu","Rédigez ici les dispositions, clauses et conditions de l'acte notarié…");
+  GrassoniWidgets.setRTEValue("rte-contenu", d.contenu||"");
+  GrassoniWidgets.initRTE("rte-biens","Description des biens, propriétés, montants ou droits concernés…");
+  GrassoniWidgets.setRTEValue("rte-biens", d.biens||"");
+  GrassoniWidgets.initRTE("rte-notes","Observations confidentielles du notaire…");
+  GrassoniWidgets.setRTEValue("rte-notes", d.notes||"");
+  GrassoniWidgets.initClientPicker("f-partie1", ()=>clientsList);
+  GrassoniWidgets.initClientPicker("f-partie2", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.saveActe=async function(){
-  const partie1=document.getElementById("f-partie1").value.trim();if(!partie1){showToast("La partie principale est obligatoire.");return;}
-  const data={type:document.getElementById("f-type").value,status:document.getElementById("f-status").value,partie1,partie2:document.getElementById("f-partie2").value.trim(),notaire:document.getElementById("f-notaire").value.trim(),date:document.getElementById("f-date").value,lieu:document.getElementById("f-lieu").value.trim(),valeur:document.getElementById("f-valeur").value,temoins:document.getElementById("f-temoins").value.trim(),contenu:document.getElementById("f-contenu").value.trim(),biens:document.getElementById("f-biens").value.trim(),notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
+  const p1field=document.getElementById("f-partie1"), p2field=document.getElementById("f-partie2");
+  const partie1=p1field.value.trim();if(!partie1){showToast("La partie principale est obligatoire.");return;}
+  const data={type:document.getElementById("f-type").value,status:document.getElementById("f-status").value,
+    partie1,partie1Id:p1field.dataset.clientId||"",partie1Numero:p1field.dataset.clientNumero||"",
+    partie2:p2field.value.trim(),partie2Id:p2field.dataset.clientId||"",partie2Numero:p2field.dataset.clientNumero||"",
+    notaire:document.getElementById("f-notaire").value.trim(),date:document.getElementById("f-date").value,
+    lieu:document.getElementById("f-lieu").value.trim(),valeur:document.getElementById("f-valeur").value,
+    temoins:document.getElementById("f-temoins").value.trim(),
+    contenu:GrassoniWidgets.getRTEValue("rte-contenu"),biens:GrassoniWidgets.getRTEValue("rte-biens"),
+    notes:GrassoniWidgets.getRTEValue("rte-notes"),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"actes",editId),data);showToast("Acte mis à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"actes"),data);showToast("Acte notarié enregistré.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 window.deleteItem=async function(id){if(!confirm("Supprimer cet acte notarié ?"))return;await deleteDoc(doc(db,"actes",id));showToast("Acte supprimé.");};
+let currentViewId=null;
 window.viewItem=function(id){
+  currentViewId=id;
   const d=items.find(x=>x.id===id);if(!d)return;
   const sBadge=s=>s==="Signé & authentifié"?"badge-active":s==="En cours de rédaction"?"badge-pending":s==="En litige"?"badge-urgent":"badge-closed";
   document.getElementById("detailBody").innerHTML=`
@@ -152,21 +201,59 @@ window.viewItem=function(id){
       <span class="tag">${d.type}</span> <span class="badge ${sBadge(d.status)}">${d.status}</span>
     </div>
     <table style="width:100%;font-size:0.88rem;border-collapse:collapse;">
-      ${row("Partie Principale",d.partie1)}${row("Partie Secondaire",d.partie2)}${row("Notaire",d.notaire)}
+      ${row("Partie Principale",d.partie1Numero?`${d.partie1} (${d.partie1Numero})`:d.partie1)}${row("Partie Secondaire",d.partie2Numero?`${d.partie2} (${d.partie2Numero})`:d.partie2)}${row("Notaire",d.notaire)}
       ${row("Date",d.date)}${row("Lieu",d.lieu)}${row("Valeur",d.valeur?"$"+parseFloat(d.valeur).toLocaleString():"")}
       ${row("Témoins",d.temoins)}
     </table>
     ${d.contenu?`<div class="divider-ornament"><span class="ornament-text">DISPOSITIONS DE L'ACTE</span></div><div style="font-size:0.9rem;color:var(--ink-faded);line-height:1.8;font-style:italic;background:rgba(245,238,220,0.7);padding:1rem;border-left:3px solid var(--sepia);">${d.contenu}</div>`:""}
-    ${d.biens?`<div class="divider-ornament"><span class="ornament-text">BIENS DÉSIGNÉS</span></div><p style="font-size:0.88rem;color:var(--ink-faded);">${d.biens}</p>`:""}
-    ${d.notes?`<div class="divider-ornament"><span class="ornament-text">NOTES INTERNES</span></div><p style="font-size:0.85rem;color:var(--ink-faded);font-style:italic;">${d.notes}</p>`:""}`;
+    ${d.biens?`<div class="divider-ornament"><span class="ornament-text">BIENS DÉSIGNÉS</span></div><div style="font-size:0.88rem;color:var(--ink-faded);">${d.biens}</div>`:""}
+    ${d.notes?`<div class="divider-ornament"><span class="ornament-text">NOTES INTERNES</span></div><div style="font-size:0.85rem;color:var(--ink-faded);font-style:italic;">${d.notes}</div>`:""}`;
   document.getElementById("detailOverlay").classList.add("open");
+};
+window.exportActe=async function(){
+  const d=items.find(x=>x.id===currentViewId);if(!d)return;
+  const btn=document.getElementById("exportBtn"); const oldText=btn.textContent;
+  btn.textContent="⏳ Génération…"; btn.disabled=true;
+  const html=`
+    <div class="doc-export-sheet">
+      <div class="doc-export-header">
+        <div class="doc-export-firm">⚖ Grassoni & Associates</div>
+        <div class="doc-export-tagline">Attorneys, Counselors & Notaries — Saint Denis, Lemoyne</div>
+        <div class="doc-export-type">${d.type}</div>
+      </div>
+      <div class="doc-export-body">
+        <div class="doc-export-field-row">
+          <div class="doc-export-field"><div class="doc-export-label">PARTIE PRINCIPALE</div><div class="doc-export-value">${d.partie1}${d.partie1Numero?" ("+d.partie1Numero+")":""}</div></div>
+          <div class="doc-export-field"><div class="doc-export-label">PARTIE SECONDAIRE</div><div class="doc-export-value">${d.partie2||"—"}${d.partie2Numero?" ("+d.partie2Numero+")":""}</div></div>
+        </div>
+        <div class="doc-export-field-row">
+          <div class="doc-export-field"><div class="doc-export-label">DATE</div><div class="doc-export-value">${d.date||"—"}</div></div>
+          <div class="doc-export-field"><div class="doc-export-label">LIEU</div><div class="doc-export-value">${d.lieu||"—"}</div></div>
+          <div class="doc-export-field"><div class="doc-export-label">NOTAIRE</div><div class="doc-export-value">${d.notaire||"—"}</div></div>
+        </div>
+        <div style="margin:1.4rem 0;border-top:1px solid #c8a86e;"></div>
+        ${d.contenu||"<p><em>Aucune disposition rédigée.</em></p>"}
+        ${d.biens?`<div style="margin-top:1rem;"><div class="doc-export-label">BIENS & OBJETS DÉSIGNÉS</div>${d.biens}</div>`:""}
+        ${d.temoins?`<div style="margin-top:1rem;"><div class="doc-export-label">TÉMOINS</div><div class="doc-export-value">${d.temoins}</div></div>`:""}
+      </div>
+      <div class="doc-export-footer">
+        <div class="doc-export-sig"><div class="doc-export-sig-line">Signature — ${d.partie1||"Partie Principale"}</div></div>
+        <div class="doc-export-sig"><div class="doc-export-seal">⚖</div><div class="doc-export-sig-line">Maître ${d.notaire||"Grassoni"}, Notaire</div></div>
+        <div class="doc-export-sig"><div class="doc-export-sig-line">Signature — ${d.partie2||"Partie Secondaire"}</div></div>
+      </div>
+    </div>`;
+  try{
+    await GrassoniWidgets.exportNodeAsPNG(html, `Acte_${d.type.replace(/\s+/g,"_")}_${d.partie1.replace(/\s+/g,"_")}`);
+    showToast("Document exporté en PNG.");
+  }catch(e){ showToast("Erreur d'export: "+e.message); }
+  btn.textContent=oldText; btn.disabled=false;
 };
 function row(l,v){return v?`<tr><td style="font-family:'IM Fell English SC',serif;font-size:0.63rem;letter-spacing:0.1em;color:var(--sepia);padding:0.3rem 0.4rem 0.3rem 0;width:38%;border-bottom:1px dashed var(--parchment-dark);">${l}</td><td style="padding:0.3rem 0;border-bottom:1px dashed var(--parchment-dark);color:var(--ink-faded);">${v}</td></tr>`:""; }
 window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove("open");
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>

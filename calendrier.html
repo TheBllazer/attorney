@@ -102,7 +102,7 @@
         <div class="form-group"><label class="form-label">Heure</label><input class="form-input" type="time" id="f-heure"/></div>
         <div class="form-group"><label class="form-label">Lieu / Juridiction</label><input class="form-input" id="f-lieu" placeholder="ex: Tribunal de Saint Denis, Salle 3"/></div>
         <div class="form-group"><label class="form-label">Avocat / Responsable</label><input class="form-input" id="f-avocat" placeholder="Maître Grassoni…"/></div>
-        <div class="form-group"><label class="form-label">Client concerné</label><input class="form-input" id="f-client" placeholder="Nom du client"/></div>
+        <div class="form-group"><label class="form-label">Client concerné</label><input class="form-input" id="f-client" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Référence Dossier</label><input class="form-input" id="f-dossier" placeholder="ex: DOS-0042"/></div>
         <div class="form-group full"><label class="form-label">Description & Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Détails de l'événement, pièces à préparer, instructions…"></textarea></div>
       </div>
@@ -124,13 +124,14 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
-let events=[],editId=null;
+let events=[],editId=null,clientsList=[];
 let viewYear=new Date().getFullYear(), viewMonth=new Date().getMonth();
 const MONTHS=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
 const DAYS=["Dim","Lun","Mar","Mer","Jeu","Ven","Sam"];
@@ -141,9 +142,12 @@ onAuthStateChanged(auth,async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"calendrier.html");setDate();listen();
+  buildSidebar(p,"calendrier.html");setDate();listen();listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{ clientsList=snap.docs.map(d=>({id:d.id,...d.data()})); });
+}
 
 function listen(){
   onSnapshot(query(collection(db,"calendrier"),orderBy("date","asc")),snap=>{
@@ -213,7 +217,10 @@ window.openModal=function(){
   editId=null;
   document.getElementById("modalTitle").textContent="📅 Inscription d'un Événement";
   ["intitule","lieu","avocat","client","dossier","notes","heure"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-client").dataset.clientId;
+  delete document.getElementById("f-client").dataset.clientNumero;
   if(!document.getElementById("f-date").value) document.getElementById("f-date").value=new Date().toISOString().slice(0,10);
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
   document.getElementById("modalOverlay").classList.add("open");
 };
 window.closeModal=()=>{document.getElementById("modalOverlay").classList.remove("open");document.getElementById("f-date").value="";};
@@ -250,21 +257,25 @@ window.editEvent=function(id){
   const e=events.find(x=>x.id===id);if(!e)return;
   editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier l'Événement";
   ["intitule","lieu","avocat","client","dossier","notes","heure","date"].forEach(f=>document.getElementById("f-"+f).value=e[f]||"");
+  if(e.clientId) document.getElementById("f-client").dataset.clientId=e.clientId;
+  if(e.clientNumero) document.getElementById("f-client").dataset.clientNumero=e.clientNumero;
   document.getElementById("f-type").value=e.type||"audience";
   document.getElementById("f-priorite").value=e.priorite||"Normale";
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
   document.getElementById("modalOverlay").classList.add("open");
 };
 window.deleteEvent=async function(id){if(!confirm("Supprimer cet événement ?"))return;await deleteDoc(doc(db,"calendrier",id));closeDetail();showToast("Événement supprimé.");};
 window.saveEvent=async function(){
   const intitule=document.getElementById("f-intitule").value.trim();const date=document.getElementById("f-date").value;
+  const clientField=document.getElementById("f-client");
   if(!intitule||!date){showToast("Intitulé et date obligatoires.");return;}
-  const data={intitule,type:document.getElementById("f-type").value,priorite:document.getElementById("f-priorite").value,date,heure:document.getElementById("f-heure").value,lieu:document.getElementById("f-lieu").value.trim(),avocat:document.getElementById("f-avocat").value.trim(),client:document.getElementById("f-client").value.trim(),dossier:document.getElementById("f-dossier").value.trim(),notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
+  const data={intitule,type:document.getElementById("f-type").value,priorite:document.getElementById("f-priorite").value,date,heure:document.getElementById("f-heure").value,lieu:document.getElementById("f-lieu").value.trim(),avocat:document.getElementById("f-avocat").value.trim(),client:clientField.value.trim(),clientId:clientField.dataset.clientId||"",clientNumero:clientField.dataset.clientNumero||"",dossier:document.getElementById("f-dossier").value.trim(),notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"calendrier",editId),data);showToast("Événement mis à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"calendrier"),data);showToast("Événement inscrit.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>

@@ -62,8 +62,8 @@
         <div class="form-group"><label class="form-label">Date / Année</label><input class="form-input" id="f-annee" placeholder="ex: 1892, 15 mars 1899…"/></div>
         <div class="form-group"><label class="form-label">Référence / Cote</label><input class="form-input" id="f-reference" placeholder="ex: Art. 742, Arrêt n°1204…"/></div>
         <div class="form-group"><label class="form-label">Localisation (rayon/étagère)</label><input class="form-input" id="f-localisation" placeholder="ex: Rayon III, Shelf B…"/></div>
-        <div class="form-group full"><label class="form-label">Résumé & Contenu Principal</label><textarea class="form-textarea" id="f-resume" style="min-height:120px;" placeholder="Résumé de la disposition, du raisonnement juridique ou du contenu de l'ouvrage…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Extraits & Citations Notables</label><textarea class="form-textarea" id="f-extraits" placeholder="Passages particulièrement pertinents pour les affaires du cabinet…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Résumé & Contenu Principal</label><div id="rte-resume"></div></div>
+        <div class="form-group full"><label class="form-label">Extraits & Citations Notables</label><div id="rte-extraits"></div></div>
         <div class="form-group full"><label class="form-label">Dossiers Liés</label><input class="form-input" id="f-dossiers" placeholder="Références aux dossiers où ce texte est invoqué…"/></div>
       </div>
     </div>
@@ -83,6 +83,7 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
@@ -168,12 +169,29 @@ window.renderCards=function(){
     </div>`).join("");
 };
 
-window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="📚 Ajout d'une Référence";["titre","auteur","annee","reference","localisation","resume","extraits","dossiers"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("modalOverlay").classList.add("open");};
+window.openModal=function(){
+  editId=null;document.getElementById("modalTitle").textContent="📚 Ajout d'une Référence";
+  ["titre","auteur","annee","reference","localisation","dossiers"].forEach(f=>document.getElementById("f-"+f).value="");
+  GrassoniWidgets.initRTE("rte-resume","Résumé de la disposition, du raisonnement juridique ou du contenu de l'ouvrage…");
+  GrassoniWidgets.initRTE("rte-extraits","Passages particulièrement pertinents pour les affaires du cabinet…");
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
-window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d||d._source==="default")return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier la Référence";["titre","auteur","annee","reference","localisation","resume","extraits","dossiers"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-categorie").value=d.categorie||"Texte de loi";document.getElementById("f-domaine").value=d.domaine||"Droit civil";document.getElementById("modalOverlay").classList.add("open");};
+window.editItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d||d._source==="default")return;editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier la Référence";
+  ["titre","auteur","annee","reference","localisation","dossiers"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");
+  document.getElementById("f-categorie").value=d.categorie||"Texte de loi";
+  document.getElementById("f-domaine").value=d.domaine||"Droit civil";
+  GrassoniWidgets.initRTE("rte-resume","Résumé de la disposition, du raisonnement juridique ou du contenu de l'ouvrage…");
+  GrassoniWidgets.setRTEValue("rte-resume", d.resume||"");
+  GrassoniWidgets.initRTE("rte-extraits","Passages particulièrement pertinents pour les affaires du cabinet…");
+  GrassoniWidgets.setRTEValue("rte-extraits", d.extraits||"");
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.saveRef=async function(){
   const titre=document.getElementById("f-titre").value.trim();if(!titre){showToast("Le titre est obligatoire.");return;}
-  const data={titre,categorie:document.getElementById("f-categorie").value,domaine:document.getElementById("f-domaine").value,auteur:document.getElementById("f-auteur").value.trim(),annee:document.getElementById("f-annee").value.trim(),reference:document.getElementById("f-reference").value.trim(),localisation:document.getElementById("f-localisation").value.trim(),resume:document.getElementById("f-resume").value.trim(),extraits:document.getElementById("f-extraits").value.trim(),dossiers:document.getElementById("f-dossiers").value.trim(),updatedAt:new Date().toISOString()};
+  const data={titre,categorie:document.getElementById("f-categorie").value,domaine:document.getElementById("f-domaine").value,auteur:document.getElementById("f-auteur").value.trim(),annee:document.getElementById("f-annee").value.trim(),reference:document.getElementById("f-reference").value.trim(),localisation:document.getElementById("f-localisation").value.trim(),resume:GrassoniWidgets.getRTEValue("rte-resume"),extraits:GrassoniWidgets.getRTEValue("rte-extraits"),dossiers:document.getElementById("f-dossiers").value.trim(),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"bibliotheque",editId),data);showToast("Référence mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"bibliotheque"),data);showToast("Référence cataloguée.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 window.deleteItem=async function(id){if(!confirm("Supprimer cette référence ?"))return;await deleteDoc(doc(db,"bibliotheque",id));showToast("Référence supprimée.");};
@@ -194,7 +212,7 @@ window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>

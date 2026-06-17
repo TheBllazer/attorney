@@ -67,15 +67,40 @@ Dans **Firebase Console → Authentication → Users → Ajouter un utilisateur*
 ├── index.html          ← Redirection automatique
 ├── login.html          ← Page de connexion (1905)
 ├── dashboard.html      ← Tableau de bord principal
-├── clients.html        ← Registre des clients
+├── clients.html        ← Registre des clients (N° personnalisé)
 ├── dossiers.html       ← Dossiers judiciaires
+├── contrats.html       ← Registre des contrats (2 parties)
 ├── foncier.html        ← Registre foncier
 ├── societes.html       ← Registre des sociétés
-├── notariat.html       ← Bureau notarial
+├── notariat.html       ← Bureau notarial (export PNG)
 ├── bibliotheque.html   ← Bibliothèque juridique
 ├── comptabilite.html   ← Livre de comptes
-└── calendrier.html     ← Calendrier judiciaire
+├── calendrier.html     ← Calendrier judiciaire
+├── shared.css           ← Styles communs
+├── shared.js             ← Config Firebase partagée
+└── widgets.js           ← Éditeur riche, sélecteur clients, export PNG
 ```
+
+---
+
+## ✨ Fonctionnalités avancées
+
+### Numéro de client personnalisé
+Chaque client reçoit un identifiant unique choisi librement (ex: `CLI-A.MORGAN-01`) lors de sa création dans **clients.html**. Ce numéro :
+- Est vérifié pour son unicité avant l'enregistrement
+- Apparaît automatiquement dans tous les registres où le client est sélectionné (Dossiers, Contrats, Foncier, Sociétés, Comptabilité, Calendrier, Notariat)
+
+### Sélecteur de clients (auto-complétion)
+Dans les formulaires de Dossiers, Contrats, Foncier, Sociétés, Comptabilité, Calendrier et Notariat, les champs liés à un client (Client Principal, Propriétaire, Dirigeant, Partie A/B…) proposent une liste déroulante alimentée en temps réel par le Registre des Clients. Taper du texte filtre la liste ; cliquer sur un résultat associe automatiquement le N° de client.
+
+### Éditeur de texte riche
+Les champs longs (Description, Notes, Clauses, Contenu d'acte, Objet social…) disposent d'une barre d'outils : gras, italique, souligné, listes, citation, alignement. Le contenu est stocké en HTML dans Firestore et s'affiche fidèlement dans les fiches de détail.
+
+### Registre des Contrats (nouveau module)
+Permet de rédiger des contrats entre deux parties (personnes physiques ou morales), avec sélection des parties depuis le Registre des Clients, valeur, échéance, clauses en éditeur riche, et export PNG.
+
+### Export PNG dynamique
+Dans **Bureau Notarial** et **Registre des Contrats**, chaque fiche de détail propose un bouton "🖼 Exporter en PNG" qui génère une image fidèle au document (acte ou contrat), prête à être partagée ou imprimée, avec mise en page parchemin et zones de signature.
 
 ---
 

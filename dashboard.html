@@ -440,6 +440,9 @@
     <a class="nav-item" href="dossiers.html">
       <span class="nav-icon">📁</span> Dossiers Judiciaires
     </a>
+    <a class="nav-item" href="contrats.html">
+      <span class="nav-icon">🤝</span> Registre des Contrats
+    </a>
 
     <div class="nav-section-label">Registres Officiels</div>
     <a class="nav-item" href="foncier.html">
@@ -497,6 +500,11 @@
         <span class="stat-icon">📁</span>
         <div class="stat-number" id="statDossiers">—</div>
         <div class="stat-label">Dossiers Actifs</div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🤝</span>
+        <div class="stat-number" id="statContrats">—</div>
+        <div class="stat-label">Contrats Actifs</div>
       </div>
       <div class="stat-card">
         <span class="stat-icon">✒️</span>
@@ -633,7 +641,7 @@
 
   async function loadStats() {
     try {
-      const cols = { clients: "statClients", dossiers: "statDossiers", actes: "statActes", audiences: "statAudiences" };
+      const cols = { clients: "statClients", dossiers: "statDossiers", contrats: "statContrats", actes: "statActes", audiences: "statAudiences" };
       for (const [col, id] of Object.entries(cols)) {
         try {
           const snap = await getDocs(collection(db, col));

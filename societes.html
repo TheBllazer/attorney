@@ -57,15 +57,15 @@
           <select class="form-select" id="f-status"><option>En activité</option><option>En liquidation</option><option>Dissoute</option><option>Suspendue</option></select></div>
         <div class="form-group"><label class="form-label">Secteur d'Activité</label><input class="form-input" id="f-secteur" placeholder="ex: Commerce, Élevage, Banque…"/></div>
         <div class="form-group"><label class="form-label">Capital Social ($)</label><input class="form-input" type="number" id="f-capital" placeholder="0.00"/></div>
-        <div class="form-group"><label class="form-label">Dirigeant Principal</label><input class="form-input" id="f-dirigeant" placeholder="Nom du Président / Directeur"/></div>
+        <div class="form-group"><label class="form-label">Dirigeant Principal</label><input class="form-input" id="f-dirigeant" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Siège Social — Ville</label><input class="form-input" id="f-ville" placeholder="ex: Saint Denis"/></div>
         <div class="form-group"><label class="form-label">Territoire</label>
           <select class="form-select" id="f-territoire"><option>Lemoyne</option><option>West Elizabeth</option><option>New Hanover</option><option>Ambarino</option><option>Scarlett Meadows</option><option>Bayou Nwa</option><option>Tall Trees</option><option>Big Valley</option><option>Heartlands</option></select></div>
         <div class="form-group"><label class="form-label">Date de Constitution</label><input class="form-input" type="date" id="f-constitution"/></div>
         <div class="form-group"><label class="form-label">N° d'Acte Constitutif</label><input class="form-input" id="f-acte" placeholder="ex: NOT-0023"/></div>
-        <div class="form-group full"><label class="form-label">Associés & Parts Sociales</label><textarea class="form-textarea" id="f-associes" placeholder="Prénom Nom — X parts — X% ; …"></textarea></div>
-        <div class="form-group full"><label class="form-label">Objet Social</label><textarea class="form-textarea" id="f-objet" placeholder="Description de l'activité et des buts de la société…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Notes & Observations</label><textarea class="form-textarea" id="f-notes" placeholder="Contentieux, décisions d'assemblée, modifications…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Associés & Parts Sociales</label><div id="rte-associes"></div></div>
+        <div class="form-group full"><label class="form-label">Objet Social</label><div id="rte-objet"></div></div>
+        <div class="form-group full"><label class="form-label">Notes & Observations</label><div id="rte-notes"></div></div>
         <div class="form-group full"><label class="form-label">Logo / Tampon (URL Postimage)</label><input class="form-input" id="f-logo" placeholder="https://i.postimg.cc/…"/></div>
       </div>
     </div>
@@ -85,20 +85,24 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
-let items=[],editId=null;
+let items=[],editId=null,clientsList=[];
 onAuthStateChanged(auth,async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"societes.html");setDate();listen();
+  buildSidebar(p,"societes.html");setDate();listen();listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{ clientsList=snap.docs.map(d=>({id:d.id,...d.data()})); });
+}
 function listen(){
   onSnapshot(query(collection(db,"societes"),orderBy("createdAt","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -126,7 +130,7 @@ window.renderTable=function(){
       <td><span class="tag">${item.forme||"—"}</span></td>
       <td style="font-size:0.8rem;">${item.secteur||"—"}</td>
       <td style="font-size:0.8rem;color:var(--sepia);">${item.ville||"—"}, ${item.territoire||""}</td>
-      <td style="font-size:0.8rem;font-style:italic;">${item.dirigeant||"—"}</td>
+      <td style="font-size:0.8rem;font-style:italic;">${item.dirigeant||"—"}${item.dirigeantNumero?` <span class="tag">${item.dirigeantNumero}</span>`:""}</td>
       <td style="font-size:0.8rem;">${item.capital?"$"+parseFloat(item.capital).toLocaleString():"—"}</td>
       <td><span class="badge ${sBadge(item.status)}">${item.status||"—"}</span></td>
       <td>
@@ -136,12 +140,41 @@ window.renderTable=function(){
       </td>
     </tr>`).join("");
 };
-window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="🏢 Constitution d'une Société";["raison","secteur","capital","dirigeant","ville","acte","associes","objet","notes","logo"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-constitution").value=new Date().toISOString().slice(0,10);document.getElementById("modalOverlay").classList.add("open");};
+window.openModal=function(){
+  editId=null;document.getElementById("modalTitle").textContent="🏢 Constitution d'une Société";
+  ["raison","secteur","capital","dirigeant","ville","acte","logo"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-dirigeant").dataset.clientId; delete document.getElementById("f-dirigeant").dataset.clientNumero;
+  document.getElementById("f-constitution").value=new Date().toISOString().slice(0,10);
+  GrassoniWidgets.initRTE("rte-associes","Prénom Nom — X parts — X% ; …");
+  GrassoniWidgets.initRTE("rte-objet","Description de l'activité et des buts de la société…");
+  GrassoniWidgets.initRTE("rte-notes","Contentieux, décisions d'assemblée, modifications…");
+  GrassoniWidgets.initClientPicker("f-dirigeant", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
-window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier la Fiche Société";["raison","secteur","capital","dirigeant","ville","acte","associes","objet","notes","logo"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-forme").value=d.forme||"Société en nom collectif";document.getElementById("f-status").value=d.status||"En activité";document.getElementById("f-territoire").value=d.territoire||"Lemoyne";document.getElementById("f-constitution").value=d.constitution||"";document.getElementById("modalOverlay").classList.add("open");};
+window.editItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier la Fiche Société";
+  ["raison","secteur","capital","dirigeant","ville","acte","logo"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");
+  if(d.dirigeantId) document.getElementById("f-dirigeant").dataset.clientId=d.dirigeantId;
+  if(d.dirigeantNumero) document.getElementById("f-dirigeant").dataset.clientNumero=d.dirigeantNumero;
+  document.getElementById("f-forme").value=d.forme||"Société en nom collectif";
+  document.getElementById("f-status").value=d.status||"En activité";
+  document.getElementById("f-territoire").value=d.territoire||"Lemoyne";
+  document.getElementById("f-constitution").value=d.constitution||"";
+  GrassoniWidgets.initRTE("rte-associes","Prénom Nom — X parts — X% ; …");
+  GrassoniWidgets.setRTEValue("rte-associes", d.associes||"");
+  GrassoniWidgets.initRTE("rte-objet","Description de l'activité et des buts de la société…");
+  GrassoniWidgets.setRTEValue("rte-objet", d.objet||"");
+  GrassoniWidgets.initRTE("rte-notes","Contentieux, décisions d'assemblée, modifications…");
+  GrassoniWidgets.setRTEValue("rte-notes", d.notes||"");
+  GrassoniWidgets.initClientPicker("f-dirigeant", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.saveSociete=async function(){
   const raison=document.getElementById("f-raison").value.trim();if(!raison){showToast("La raison sociale est obligatoire.");return;}
-  const data={raison,forme:document.getElementById("f-forme").value,status:document.getElementById("f-status").value,secteur:document.getElementById("f-secteur").value.trim(),capital:document.getElementById("f-capital").value,dirigeant:document.getElementById("f-dirigeant").value.trim(),ville:document.getElementById("f-ville").value.trim(),territoire:document.getElementById("f-territoire").value,constitution:document.getElementById("f-constitution").value,acte:document.getElementById("f-acte").value.trim(),associes:document.getElementById("f-associes").value.trim(),objet:document.getElementById("f-objet").value.trim(),notes:document.getElementById("f-notes").value.trim(),logo:document.getElementById("f-logo").value.trim(),updatedAt:new Date().toISOString()};
+  const dirField=document.getElementById("f-dirigeant");
+  const data={raison,forme:document.getElementById("f-forme").value,status:document.getElementById("f-status").value,secteur:document.getElementById("f-secteur").value.trim(),capital:document.getElementById("f-capital").value,dirigeant:dirField.value.trim(),dirigeantId:dirField.dataset.clientId||"",dirigeantNumero:dirField.dataset.clientNumero||"",ville:document.getElementById("f-ville").value.trim(),territoire:document.getElementById("f-territoire").value,constitution:document.getElementById("f-constitution").value,acte:document.getElementById("f-acte").value.trim(),associes:GrassoniWidgets.getRTEValue("rte-associes"),objet:GrassoniWidgets.getRTEValue("rte-objet"),notes:GrassoniWidgets.getRTEValue("rte-notes"),logo:document.getElementById("f-logo").value.trim(),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"societes",editId),data);showToast("Fiche société mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"societes"),data);showToast("Société enregistrée.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 window.deleteItem=async function(id){if(!confirm("Supprimer cette fiche société ?"))return;await deleteDoc(doc(db,"societes",id));showToast("Fiche supprimée.");};
@@ -167,7 +200,7 @@ window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>

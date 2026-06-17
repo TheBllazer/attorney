@@ -70,13 +70,13 @@
           <select class="form-select" id="f-categorie"><option>Honoraires</option><option>Provision</option><option>Frais de justice</option><option>Salaires</option><option>Loyer & charges</option><option>Fournitures</option><option>Autre</option></select></div>
         <div class="form-group"><label class="form-label">Montant ($) *</label><input class="form-input" type="number" id="f-montant" placeholder="0.00" step="0.01"/></div>
         <div class="form-group"><label class="form-label">Date</label><input class="form-input" type="date" id="f-date"/></div>
-        <div class="form-group"><label class="form-label">Client</label><input class="form-input" id="f-client" placeholder="Nom du client"/></div>
+        <div class="form-group"><label class="form-label">Client</label><input class="form-input" id="f-client" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Référence Dossier</label><input class="form-input" id="f-dossier" placeholder="ex: DOS-0042"/></div>
         <div class="form-group"><label class="form-label">Mode de Règlement</label>
           <select class="form-select" id="f-mode"><option>Espèces</option><option>Chèque</option><option>Traite</option><option>Virement</option><option>Or</option><option>Autre</option></select></div>
         <div class="form-group"><label class="form-label">Statut</label>
           <select class="form-select" id="f-status"><option>Réglé</option><option>En attente</option><option>Partiellement réglé</option><option>Contentieux</option></select></div>
-        <div class="form-group full"><label class="form-label">Notes</label><textarea class="form-textarea" id="f-notes" placeholder="Observations, conditions, références…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Notes</label><div id="rte-notes"></div></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -87,20 +87,24 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
-let items=[],editId=null;
+let items=[],editId=null,clientsList=[];
 onAuthStateChanged(auth,async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"comptabilite.html");setDate();listen();
+  buildSidebar(p,"comptabilite.html");setDate();listen();listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{ clientsList=snap.docs.map(d=>({id:d.id,...d.data()})); });
+}
 function listen(){
   onSnapshot(query(collection(db,"comptabilite"),orderBy("createdAt","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -133,7 +137,7 @@ window.renderTable=function(){
       <td style="font-size:0.78rem;color:var(--sepia);">${item.date||"—"}</td>
       <td><div style="font-weight:600;color:var(--ink);">${item.libelle}</div>${item.client?`<div style="font-size:0.72rem;color:var(--sepia);font-style:italic;">${item.client}${item.dossier?" — "+item.dossier:""}</div>`:""}</td>
       <td><span class="tag">${item.categorie||"—"}</span></td>
-      <td style="font-size:0.8rem;color:var(--ink-faded);">${item.client||"—"}</td>
+      <td style="font-size:0.8rem;color:var(--ink-faded);">${item.client||"—"}${item.clientNumero?` <span class="tag">${item.clientNumero}</span>`:""}</td>
       <td style="font-weight:600;font-size:0.8rem;color:${item.type==="recette"?"#2a4a10":"var(--bordeaux-dark)"};">${item.type==="recette"?"▲ Recette":"▼ Dépense"}</td>
       <td style="font-family:'IM Fell English SC',serif;font-size:0.95rem;color:${item.type==="recette"?"#2a4a10":"var(--bordeaux-dark)"};font-weight:600;">${item.type==="recette"?"+":"-"}$${parseFloat(item.montant||0).toLocaleString("fr-FR",{minimumFractionDigits:2})}</td>
       <td><span class="badge ${sBadge(item.status)}">${item.status||"—"}</span></td>
@@ -143,20 +147,45 @@ window.renderTable=function(){
       </td>
     </tr>`).join("");
 };
-window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="💰 Inscription d'une Opération";["libelle","montant","client","dossier","notes"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-date").value=new Date().toISOString().slice(0,10);document.getElementById("f-type").value="recette";document.getElementById("modalOverlay").classList.add("open");};
+window.openModal=function(){
+  editId=null;document.getElementById("modalTitle").textContent="💰 Inscription d'une Opération";
+  ["libelle","montant","client","dossier"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-client").dataset.clientId; delete document.getElementById("f-client").dataset.clientNumero;
+  document.getElementById("f-date").value=new Date().toISOString().slice(0,10);
+  document.getElementById("f-type").value="recette";
+  GrassoniWidgets.initRTE("rte-notes","Observations, conditions, références…");
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
-window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier l'Opération";["libelle","montant","client","dossier","notes"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-type").value=d.type||"recette";document.getElementById("f-categorie").value=d.categorie||"Honoraires";document.getElementById("f-date").value=d.date||"";document.getElementById("f-mode").value=d.mode||"Espèces";document.getElementById("f-status").value=d.status||"Réglé";document.getElementById("modalOverlay").classList.add("open");};
+window.editItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier l'Opération";
+  ["libelle","montant","client","dossier"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");
+  if(d.clientId) document.getElementById("f-client").dataset.clientId=d.clientId;
+  if(d.clientNumero) document.getElementById("f-client").dataset.clientNumero=d.clientNumero;
+  document.getElementById("f-type").value=d.type||"recette";
+  document.getElementById("f-categorie").value=d.categorie||"Honoraires";
+  document.getElementById("f-date").value=d.date||"";
+  document.getElementById("f-mode").value=d.mode||"Espèces";
+  document.getElementById("f-status").value=d.status||"Réglé";
+  GrassoniWidgets.initRTE("rte-notes","Observations, conditions, références…");
+  GrassoniWidgets.setRTEValue("rte-notes", d.notes||"");
+  GrassoniWidgets.initClientPicker("f-client", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.saveOp=async function(){
   const libelle=document.getElementById("f-libelle").value.trim();const montant=document.getElementById("f-montant").value;
+  const clientField=document.getElementById("f-client");
   if(!libelle||!montant){showToast("Libellé et montant obligatoires.");return;}
-  const data={libelle,type:document.getElementById("f-type").value,categorie:document.getElementById("f-categorie").value,montant:parseFloat(montant),date:document.getElementById("f-date").value,client:document.getElementById("f-client").value.trim(),dossier:document.getElementById("f-dossier").value.trim(),mode:document.getElementById("f-mode").value,status:document.getElementById("f-status").value,notes:document.getElementById("f-notes").value.trim(),updatedAt:new Date().toISOString()};
+  const data={libelle,type:document.getElementById("f-type").value,categorie:document.getElementById("f-categorie").value,montant:parseFloat(montant),date:document.getElementById("f-date").value,client:clientField.value.trim(),clientId:clientField.dataset.clientId||"",clientNumero:clientField.dataset.clientNumero||"",dossier:document.getElementById("f-dossier").value.trim(),mode:document.getElementById("f-mode").value,status:document.getElementById("f-status").value,notes:GrassoniWidgets.getRTEValue("rte-notes"),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"comptabilite",editId),data);showToast("Opération mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"comptabilite"),data);showToast("Opération inscrite.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 window.deleteItem=async function(id){if(!confirm("Supprimer cette opération ?"))return;await deleteDoc(doc(db,"comptabilite",id));showToast("Opération supprimée.");};
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>

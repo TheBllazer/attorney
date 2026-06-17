@@ -56,7 +56,7 @@
           <select class="form-select" id="f-type"><option>Terres agricoles</option><option>Ranch/Élevage</option><option>Bien urbain</option><option>Mine/Ressources</option><option>Forêt/Prairie</option><option>Autre</option></select></div>
         <div class="form-group"><label class="form-label">Statut du Titre</label>
           <select class="form-select" id="f-statut"><option>Titre valide</option><option>En litige</option><option>En cours d'enregistrement</option><option>Hypothéqué</option><option>Saisi</option></select></div>
-        <div class="form-group"><label class="form-label">Propriétaire Actuel *</label><input class="form-input" id="f-proprietaire" placeholder="Nom du propriétaire"/></div>
+        <div class="form-group"><label class="form-label">Propriétaire Actuel *</label><input class="form-input" id="f-proprietaire" placeholder="Rechercher dans le registre des clients…"/></div>
         <div class="form-group"><label class="form-label">Ancien Propriétaire</label><input class="form-input" id="f-ancien" placeholder="Nom du cédant"/></div>
         <div class="form-group"><label class="form-label">Territoire</label>
           <select class="form-select" id="f-territoire"><option>Lemoyne</option><option>West Elizabeth</option><option>New Hanover</option><option>Ambarino</option><option>Scarlett Meadows</option><option>Bayou Nwa</option><option>Bluewater Marsh</option><option>Tall Trees</option><option>Big Valley</option><option>Heartlands</option><option>Grizzlies</option></select></div>
@@ -65,8 +65,8 @@
         <div class="form-group"><label class="form-label">Valeur Estimée ($)</label><input class="form-input" type="number" id="f-valeur" placeholder="0.00"/></div>
         <div class="form-group"><label class="form-label">Date d'Acquisition</label><input class="form-input" type="date" id="f-acquisition"/></div>
         <div class="form-group"><label class="form-label">N° d'Acte Notarié</label><input class="form-input" id="f-acte" placeholder="ex: NOT-0042"/></div>
-        <div class="form-group full"><label class="form-label">Description & Limites Cadastrales</label><textarea class="form-textarea" id="f-description" placeholder="Description des bornes, limites, caractéristiques de la parcelle…"></textarea></div>
-        <div class="form-group full"><label class="form-label">Charges & Servitudes</label><textarea class="form-textarea" id="f-charges" placeholder="Hypothèques, droits de passage, servitudes…"></textarea></div>
+        <div class="form-group full"><label class="form-label">Description & Limites Cadastrales</label><div id="rte-description"></div></div>
+        <div class="form-group full"><label class="form-label">Charges & Servitudes</label><div id="rte-charges"></div></div>
         <div class="form-group full"><label class="form-label">Photo / Plan (URL Postimage)</label><input class="form-input" id="f-photo" placeholder="https://i.postimg.cc/…"/></div>
       </div>
     </div>
@@ -86,20 +86,24 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<script src="widgets.js"></script>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import{getAuth,onAuthStateChanged,signOut}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import{getFirestore,collection,doc,getDoc,addDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 const FC={apiKey:"AIzaSyB0noV2hEom7l9UDnhf9yq7Xz_q0t8m8DU",authDomain:"grassoni-ec6fd.firebaseapp.com",projectId:"grassoni-ec6fd",storageBucket:"grassoni-ec6fd.firebasestorage.app",messagingSenderId:"600909811196",appId:"1:600909811196:web:6031c8d0a0e85205c03679"};
 const app=initializeApp(FC);const auth=getAuth(app);const db=getFirestore(app);
-let items=[],editId=null;
+let items=[],editId=null,clientsList=[];
 onAuthStateChanged(auth,async user=>{
   if(!user){window.location.href="login.html";return;}
   const snap=await getDoc(doc(db,"users",user.uid));
   const p=snap.exists()?snap.data():{displayName:user.email,roleLabel:"Clerc",photoURL:null};
-  buildSidebar(p,"foncier.html");setDate();listen();
+  buildSidebar(p,"foncier.html");setDate();listen();listenClients();
   document.getElementById("loading-overlay").style.display="none";
 });
+function listenClients(){
+  onSnapshot(collection(db,"clients"),snap=>{ clientsList=snap.docs.map(d=>({id:d.id,...d.data()})); });
+}
 function listen(){
   onSnapshot(query(collection(db,"foncier"),orderBy("createdAt","desc")),snap=>{
     items=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -125,7 +129,7 @@ window.renderTable=function(){
       <td style="font-family:'IM Fell English SC',serif;font-size:0.68rem;color:var(--sepia);">CAD-${String(i+1).padStart(4,"0")}</td>
       <td><div style="font-weight:600;color:var(--ink);">${item.designation}</div>${item.localite?`<div style="font-size:0.72rem;color:var(--sepia);">${item.localite}</div>`:""}</td>
       <td><span class="tag">${item.type||"—"}</span></td>
-      <td>${item.proprietaire||"—"}</td>
+      <td>${item.proprietaire||"—"}${item.proprietaireNumero?` <span class="tag">${item.proprietaireNumero}</span>`:""}</td>
       <td style="font-size:0.8rem;color:var(--sepia);">${item.territoire||"—"}</td>
       <td style="font-size:0.8rem;">${item.superficie?item.superficie+" ac":"—"}</td>
       <td style="font-size:0.8rem;">${item.valeur?"$"+parseFloat(item.valeur).toLocaleString():"—"}</td>
@@ -137,12 +141,38 @@ window.renderTable=function(){
       </td>
     </tr>`).join("");
 };
-window.openModal=function(){editId=null;document.getElementById("modalTitle").textContent="🏡 Enregistrement d'une Propriété";["designation","proprietaire","ancien","localite","superficie","valeur","acte","description","charges","photo"].forEach(f=>document.getElementById("f-"+f).value="");document.getElementById("f-acquisition").value=new Date().toISOString().slice(0,10);document.getElementById("modalOverlay").classList.add("open");};
+window.openModal=function(){
+  editId=null;document.getElementById("modalTitle").textContent="🏡 Enregistrement d'une Propriété";
+  ["designation","proprietaire","ancien","localite","superficie","valeur","acte","photo"].forEach(f=>document.getElementById("f-"+f).value="");
+  delete document.getElementById("f-proprietaire").dataset.clientId; delete document.getElementById("f-proprietaire").dataset.clientNumero;
+  document.getElementById("f-acquisition").value=new Date().toISOString().slice(0,10);
+  GrassoniWidgets.initRTE("rte-description","Description des bornes, limites, caractéristiques de la parcelle…");
+  GrassoniWidgets.initRTE("rte-charges","Hypothèques, droits de passage, servitudes…");
+  GrassoniWidgets.initClientPicker("f-proprietaire", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.closeModal=()=>document.getElementById("modalOverlay").classList.remove("open");
-window.editItem=function(id){const d=items.find(x=>x.id===id);if(!d)return;editId=id;document.getElementById("modalTitle").textContent="✏️ Modifier la Fiche Cadastrale";["designation","proprietaire","ancien","localite","superficie","valeur","acte","description","charges","photo"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");document.getElementById("f-type").value=d.type||"Terres agricoles";document.getElementById("f-statut").value=d.statut||"Titre valide";document.getElementById("f-territoire").value=d.territoire||"Lemoyne";document.getElementById("f-acquisition").value=d.acquisition||"";document.getElementById("modalOverlay").classList.add("open");};
+window.editItem=function(id){
+  const d=items.find(x=>x.id===id);if(!d)return;editId=id;
+  document.getElementById("modalTitle").textContent="✏️ Modifier la Fiche Cadastrale";
+  ["designation","proprietaire","ancien","localite","superficie","valeur","acte","photo"].forEach(f=>document.getElementById("f-"+f).value=d[f]||"");
+  if(d.proprietaireId) document.getElementById("f-proprietaire").dataset.clientId=d.proprietaireId;
+  if(d.proprietaireNumero) document.getElementById("f-proprietaire").dataset.clientNumero=d.proprietaireNumero;
+  document.getElementById("f-type").value=d.type||"Terres agricoles";
+  document.getElementById("f-statut").value=d.statut||"Titre valide";
+  document.getElementById("f-territoire").value=d.territoire||"Lemoyne";
+  document.getElementById("f-acquisition").value=d.acquisition||"";
+  GrassoniWidgets.initRTE("rte-description","Description des bornes, limites, caractéristiques de la parcelle…");
+  GrassoniWidgets.setRTEValue("rte-description", d.description||"");
+  GrassoniWidgets.initRTE("rte-charges","Hypothèques, droits de passage, servitudes…");
+  GrassoniWidgets.setRTEValue("rte-charges", d.charges||"");
+  GrassoniWidgets.initClientPicker("f-proprietaire", ()=>clientsList);
+  document.getElementById("modalOverlay").classList.add("open");
+};
 window.saveFoncier=async function(){
   const designation=document.getElementById("f-designation").value.trim();if(!designation){showToast("La désignation est obligatoire.");return;}
-  const data={designation,type:document.getElementById("f-type").value,statut:document.getElementById("f-statut").value,proprietaire:document.getElementById("f-proprietaire").value.trim(),ancien:document.getElementById("f-ancien").value.trim(),territoire:document.getElementById("f-territoire").value,localite:document.getElementById("f-localite").value.trim(),superficie:document.getElementById("f-superficie").value,valeur:document.getElementById("f-valeur").value,acquisition:document.getElementById("f-acquisition").value,acte:document.getElementById("f-acte").value.trim(),description:document.getElementById("f-description").value.trim(),charges:document.getElementById("f-charges").value.trim(),photo:document.getElementById("f-photo").value.trim(),updatedAt:new Date().toISOString()};
+  const propField=document.getElementById("f-proprietaire");
+  const data={designation,type:document.getElementById("f-type").value,statut:document.getElementById("f-statut").value,proprietaire:propField.value.trim(),proprietaireId:propField.dataset.clientId||"",proprietaireNumero:propField.dataset.clientNumero||"",ancien:document.getElementById("f-ancien").value.trim(),territoire:document.getElementById("f-territoire").value,localite:document.getElementById("f-localite").value.trim(),superficie:document.getElementById("f-superficie").value,valeur:document.getElementById("f-valeur").value,acquisition:document.getElementById("f-acquisition").value,acte:document.getElementById("f-acte").value.trim(),description:GrassoniWidgets.getRTEValue("rte-description"),charges:GrassoniWidgets.getRTEValue("rte-charges"),photo:document.getElementById("f-photo").value.trim(),updatedAt:new Date().toISOString()};
   try{if(editId){await updateDoc(doc(db,"foncier",editId),data);showToast("Fiche cadastrale mise à jour.");}else{data.createdAt=new Date().toISOString();await addDoc(collection(db,"foncier"),data);showToast("Propriété enregistrée.");}closeModal();}catch(e){showToast("Erreur: "+e.message);}
 };
 window.deleteItem=async function(id){if(!confirm("Supprimer cette fiche cadastrale ?"))return;await deleteDoc(doc(db,"foncier",id));showToast("Fiche supprimée.");};
@@ -167,7 +197,7 @@ window.closeDetail=()=>document.getElementById("detailOverlay").classList.remove
 function showToast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),3000);}
 function setDate(){const m=["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];const n=new Date();document.getElementById("topbarDate").textContent=`Saint Denis, ${n.getDate()} ${m[n.getMonth()]} 1905`;}
 window.handleLogout=async()=>{await signOut(auth);window.location.href="login.html";};
-function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
+function buildSidebar(profile,current){const items=[{href:"dashboard.html",icon:"📋",label:"Tableau de Bord",sec:"Registres Principaux"},{href:"clients.html",icon:"👤",label:"Registre des Clients",sec:"Registres Principaux"},{href:"dossiers.html",icon:"📁",label:"Dossiers Judiciaires",sec:"Registres Principaux"},{href:"contrats.html",icon:"🤝",label:"Registre des Contrats",sec:"Registres Principaux"},{href:"foncier.html",icon:"🏡",label:"Registre Foncier",sec:"Registres Officiels"},{href:"societes.html",icon:"🏢",label:"Registre des Sociétés",sec:"Registres Officiels"},{href:"notariat.html",icon:"✒️",label:"Bureau Notarial",sec:"Registres Officiels"},{href:"bibliotheque.html",icon:"📚",label:"Bibliothèque Juridique",sec:"Administration"},{href:"comptabilite.html",icon:"💰",label:"Livre de Comptes",sec:"Administration"},{href:"calendrier.html",icon:"📅",label:"Calendrier Judiciaire",sec:"Administration"}];let sections={},html="";items.forEach(i=>{if(!sections[i.sec])sections[i.sec]=[];sections[i.sec].push(i);});for(const[sec,its]of Object.entries(sections)){html+=`<div class="nav-section-label">${sec}</div>`;its.forEach(i=>{html+=`<a class="nav-item${i.href===current?" active":""}" href="${i.href}"><span class="nav-icon">${i.icon}</span>${i.label}</a>`;});}
 document.getElementById("sidebar").innerHTML=`<div class="sidebar-header"><span class="sidebar-logo">⚖</span><div class="sidebar-firm">Grassoni & Associates</div><div class="sidebar-tagline">Attorneys, Counselors & Notaries</div></div><div class="user-badge"><div class="user-avatar">${profile.photoURL?`<img src="${profile.photoURL}"/>`:"👤"}</div><div><div class="user-name">${profile.displayName||profile.email||"Utilisateur"}</div><div class="user-role">${profile.roleLabel||"Membre"}</div></div></div><nav>${html}</nav><div class="sidebar-footer"><button class="btn-logout" onclick="handleLogout()">⬡ Fermer le Registre</button></div>`;}
 </script>
 </body>
